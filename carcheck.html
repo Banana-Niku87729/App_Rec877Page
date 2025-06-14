@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <title>支出管理カレンダー</title>
     <style>
         * {
@@ -623,6 +625,29 @@
         const colors = ['#000000', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
         const predefinedAmounts = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
         const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+        const firebaseConfig = {
+          apiKey: "AIzaSyCeP5vYhs0EMgJQL4Ayka5wx-s-ehvvmAs",
+          authDomain: "carcheck-6702b.firebaseapp.com",
+          projectId: "carcheck-6702b",
+          storageBucket: "carcheck-6702b.firebasestorage.app",
+          messagingSenderId: "985992635268",
+          appId: "1:985992635268:web:8a1d5c0469d4ee563eb3d1",
+          measurementId: "G-YMMZJPYL64"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // カレンダーキーの確認と保存
+        let calendarKey = localStorage.getItem('calendarKey');
+        if (!calendarKey) {
+          calendarKey = prompt('カレンダーキーを入力してください：');
+          if (calendarKey) {
+            localStorage.setItem('calendarKey', calendarKey);
+          } else {
+            alert('キーが必要です。');
+          }
+        }
 
         // 初期化
         document.addEventListener('DOMContentLoaded', function() {
@@ -632,6 +657,19 @@
             createColorGrid();
             createAmountGrid();
             updateTotalAmount();
+            if (calendarKey) {
+              db.collection('calendars')
+                .doc(calendarKey)
+                .collection('expenses')
+                .get()
+                .then(snapshot => {
+                  snapshot.forEach(doc => {
+                    expenses[doc.id] = doc.data();
+                  });
+                  updateCalendar();
+                  updateTotalAmount();
+                });
+            };
         });
 
         // テーマ関連
@@ -861,6 +899,17 @@
                 updateTotalAmount();
                 closeExpenseModal();
             }
+            if (calendarKey) {
+                  db.collection('calendars')
+                    .doc(calendarKey)
+                    .collection('expenses')
+                    .doc(selectedDate.dateKey)
+                    .set({
+                      stamp: selectedStamp,
+                      color: selectedColor,
+                      amount: amount
+                    });
+                }
         }
 
         // 支払い関連
@@ -885,6 +934,23 @@
             updateCalendar();
             updateTotalAmount();
             closePaymentModal();
+            if (calendarKey) {
+            const batch = db.batch();
+            Object.keys(expenses).forEach(dateKey => {
+              const ref = db.collection('calendars')
+                           .doc(calendarKey)
+                           .collection('expenses')
+                           .doc(dateKey);
+              batch.delete(ref);
+            });
+            batch.commit().then(() => {
+              expenses = {};
+              updateCalendar();
+              updateTotalAmount();
+              closePaymentModal();
+            });
+          }
+        };
         }
     </script>
 </body>
