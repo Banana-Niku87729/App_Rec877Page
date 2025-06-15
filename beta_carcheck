@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <link rel="icon" href="favicon2.png">
+    <link rel="manifest" href="manifest.json">
+    <title>支出管理カレンダー</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            min-height: 100vh;
+        }
+
+        /* ライトモード */
+        body.light {
+            background-color: #f8fafc;
+            color: #1f2937;
+        }
+
+        /* ダークモード */
+        body.dark {
+            background-color: #111827;
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .theme-toggle {
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: background-color 0.3s;
+        }
+
+        .light .theme-toggle {
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+
+        .light .theme-toggle:hover {
+            background-color: #f3f4f6;
+        }
+
+        .dark .theme-toggle {
+            background-color: #1f2937;
+            color: #ffffff;
+        }
+
+        .dark .theme-toggle:hover {
+            background-color: #374151;
+        }
+
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .nav-btn {
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.3s;
+        }
+
+        .light .nav-btn {
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+
+        .light .nav-btn:hover {
+            background-color: #f3f4f6;
+        }
+
+        .dark .nav-btn {
+            background-color: #1f2937;
+            color: #ffffff;
+        }
+
+        .dark .nav-btn:hover {
+            background-color: #374151;
+        }
+
+        .month-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .calendar-container {
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .light .calendar-container {
+            background-color: #ffffff;
+        }
+
+        .dark .calendar-container {
+            background-color: #1f2937;
+        }
+
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .day-header {
+            padding: 8px;
+            text-align: center;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .calendar-day:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+
+        .calendar-day.empty {
+            cursor: default;
+        }
+
+        .calendar-day.empty:hover {
+            background-color: transparent;
+        }
+
+        .day-number {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .expense-stamp {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+        }
+
+        .summary-container {
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .light .summary-container {
+            background-color: #ffffff;
+        }
+
+        .dark .summary-container {
+            background-color: #1f2937;
+        }
+
+        .summary-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .total-amount {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .payment-btn {
+            padding: 8px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .payment-btn:enabled {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .payment-btn:enabled:hover {
+            background-color: #2563eb;
+        }
+
+        .payment-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .light .payment-btn:disabled {
+            background-color: #e5e7eb;
+            color: #9ca3af;
+        }
+
+        .dark .payment-btn:disabled {
+            background-color: #374151;
+            color: #6b7280;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 448px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .light .modal-content {
+            background-color: #ffffff;
+        }
+
+        .dark .modal-content {
+            background-color: #1f2937;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .stamp-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+        }
+
+        .stamp-btn {
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .stamp-btn.selected {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .light .stamp-btn:not(.selected) {
+            background-color: #f3f4f6;
+        }
+
+        .light .stamp-btn:not(.selected):hover {
+            background-color: #e5e7eb;
+        }
+
+        .dark .stamp-btn:not(.selected) {
+            background-color: #374151;
+        }
+
+        .dark .stamp-btn:not(.selected):hover {
+            background-color: #4b5563;
+        }
+
+        .color-grid {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .color-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #d1d5db;
+            cursor: pointer;
+            transition: border-color 0.3s, transform 0.3s;
+        }
+
+        .color-btn.selected {
+            border-color: #3b82f6;
+            transform: scale(1.1);
+        }
+
+        .amount-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .amount-btn {
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .amount-btn.selected {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .light .amount-btn:not(.selected) {
+            background-color: #f3f4f6;
+        }
+
+        .light .amount-btn:not(.selected):hover {
+            background-color: #e5e7eb;
+        }
+
+        .dark .amount-btn:not(.selected) {
+            background-color: #374151;
+        }
+
+        .dark .amount-btn:not(.selected):hover {
+            background-color: #4b5563;
+        }
+
+        .custom-amount-btn {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .custom-amount-input {
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            transition: border-color 0.3s;
+        }
+
+        .light .custom-amount-input {
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+
+        .dark .custom-amount-input {
+            background-color: #374151;
+            color: #ffffff;
+            border-color: #4b5563;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+
+        .modal-btn.primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .modal-btn.primary:hover {
+            background-color: #2563eb;
+        }
+
+        .light .modal-btn.secondary {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+
+        .light .modal-btn.secondary:hover {
+            background-color: #d1d5db;
+        }
+
+        .dark .modal-btn.secondary {
+            background-color: #374151;
+            color: #ffffff;
+        }
+
+        .dark .modal-btn.secondary:hover {
+            background-color: #4b5563;
+        }
+
+        .modal-btn.success {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .modal-btn.success:hover {
+            background-color: #059669;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px 8px;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+
+            .calendar-day {
+                padding: 4px;
+            }
+
+            .day-number {
+                font-size: 12px;
+            }
+
+            .expense-stamp {
+                font-size: 14px;
+            }
+
+            .stamp-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .amount-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ドロワー関連のスタイル */
+        .drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 300px;
+            max-width: 80vw;
+            transition: transform 0.3s ease-in-out;
+            z-index: 1100;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .drawer.hidden {
+            transform: translateX(-100%);
+        }
+
+        .light .drawer {
+            background-color: #f8fafc;
+            border-right: 1px solid #e5e7eb;
+        }
+
+        .dark .drawer {
+            background-color: #111827;
+            border-right: 1px solid #374151;
+        }
+        
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .dark .drawer-header {
+            border-bottom: 1px solid #374151;
+        }
+
+        .drawer-header h2 {
+            font-size: 18px;
+        }
+
+        .calendar-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        
+        .calendar-list li {
+            padding: 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 500;
+        }
+        .dark .calendar-list li {
+            border-bottom: 1px solid #374151;
+        }
+
+        .light .calendar-list li:hover {
+            background-color: #f3f4f6;
+        }
+        .dark .calendar-list li:hover {
+            background-color: #374151;
+        }
+
+        .calendar-list li.active {
+            font-weight: bold;
+        }
+        .light .calendar-list li.active {
+            background-color: #e0e7ff;
+            color: #3730a3;
+        }
+        .dark .calendar-list li.active {
+            background-color: #312e81;
+            color: #e0e7ff;
+        }
+
+        .drawer-footer {
+            padding: 16px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .dark .drawer-footer {
+            border-top: 1px solid #374151;
+        }
+
+        .drawer-footer .modal-btn {
+            width: 100%;
+        }
+
+        /* 支払い済みチェックマーク */
+        .paid-checkmark {
+            position: absolute;
+            top: 4px; /* スタンプより少し上 */
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            color: #10b981; /* 緑色 */
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="light">
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <button class="nav-btn" onclick="toggleDrawer()">☰</button>
+            <h1 class="title">
+                📅 支出管理カレンダー
+            </h1>
+            <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
+                🌙
+            </button>
+        </div>
+
+        <!-- カレンダーナビゲーション -->
+        <div class="calendar-nav">
+            <button class="nav-btn" onclick="navigateMonth(-1)">‹</button>
+            <h2 class="month-title" id="monthTitle">2025年 6月</h2>
+            <button class="nav-btn" onclick="navigateMonth(1)">›</button>
+        </div>
+
+        <!-- カレンダー -->
+        <div class="calendar-container">
+            <div class="calendar-header">
+                <div class="day-header">日</div>
+                <div class="day-header">月</div>
+                <div class="day-header">火</div>
+                <div class="day-header">水</div>
+                <div class="day-header">木</div>
+                <div class="day-header">金</div>
+                <div class="day-header">土</div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- カレンダーの日付がここに動的に挿入されます -->
+            </div>
+        </div>
+
+        <!-- 総額と支払いボタン -->
+        <div class="summary-container">
+            <div class="summary-content">
+                <div class="total-amount" id="totalAmount">総額: ¥0</div>
+                <button class="payment-btn" onclick="showPaymentConfirm()" id="paymentBtn" disabled>
+                    支払い
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 支出設定モーダル -->
+    <div class="modal hidden" id="expenseModal">
+        <div class="modal-content">
+            <h3 class="modal-title" id="modalTitle">支出を設定</h3>
+            
+            <div class="form-group">
+                <label class="form-label">スタンプ</label>
+                <div class="stamp-grid" id="stampGrid">
+                    <!-- スタンプボタンがここに動的に挿入されます -->
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">色</label>
+                <div class="color-grid" id="colorGrid">
+                    <!-- カラーボタンがここに動的に挿入されます -->
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">金額</label>
+                <div class="amount-grid" id="amountGrid">
+                    <!-- 金額ボタンがここに動的に挿入されます -->
+                </div>
+                <button class="custom-amount-btn amount-btn" onclick="toggleCustomAmount()">
+                    金額を指定
+                </button>
+                <input type="number" class="custom-amount-input hidden" id="customAmountInput" 
+                       placeholder="金額を入力" min="1">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeExpenseModal()">
+                    キャンセル
+                </button>
+                <button class="modal-btn primary" onclick="saveExpense()">
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 支払い確認モーダル -->
+    <div class="modal hidden" id="paymentModal">
+        <div class="modal-content">
+            <h3 class="modal-title">支払い確認</h3>
+            <p style="margin-bottom: 24px;">
+                支払いを確認します。OKを押すと処理が完了します。
+            </p>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closePaymentModal()">
+                    キャンセル
+                </button>
+                <button class="modal-btn success" onclick="processPayment()">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="drawer hidden" id="drawer">
+        <div class="drawer-header">
+            <h2>カレンダーリスト</h2>
+            <button class="nav-btn" onclick="toggleDrawer()">×</button>
+        </div>
+        <ul class="calendar-list" id="calendarList">
+            </ul>
+        <div class="drawer-footer">
+            <button class="modal-btn primary" onclick="joinNewCalendar()">新しいカレンダーに参加</button>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let currentDate = new Date();
+        let expenses = {};
+        let selectedDate = null;
+        let selectedStamp = '💰';
+        let selectedColor = '#000000';
+        let selectedAmount = 100;
+        let showCustomAmount = false;
+        let calendarKey = null; // 現在アクティブなカレンダーのキー
+        let calendarList = []; // 保存されているカレンダーのリスト
+
+        const stamps = ['💰', '🛒', '🍔', '☕', '🚗', '🏠', '💊', '📚', '🎬', '👕', '⚡', '📱'];
+        const colors = ['#000000', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
+        const predefinedAmounts = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+        const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+        const firebaseConfig = {
+          apiKey: "AIzaSyCeP5vYhs0EMgJQL4Ayka5wx-s-ehvvmAs",
+          authDomain: "carcheck-6702b.firebaseapp.com",
+          projectId: "carcheck-6702b",
+          storageBucket: "carcheck-6702b.firebasestorage.app",
+          messagingSenderId: "985992635268",
+          appId: "1:985992635268:web:8a1d5c0469d4ee563eb3d1",
+          measurementId: "G-YMMZJPYL64"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function initializeCalendars() {
+            const storedList = localStorage.getItem('calendarList');
+            if (storedList) {
+                calendarList = JSON.parse(storedList);
+            }
+            
+            let activeKey = localStorage.getItem('activeCalendarKey');
+            
+            if (calendarList.length > 0) {
+                if (activeKey && calendarList.some(c => c.key === activeKey)) {
+                    calendarKey = activeKey;
+                } else {
+                    calendarKey = calendarList[0].key; // アクティブキーがなければリストの先頭を使う
+                    localStorage.setItem('activeCalendarKey', calendarKey);
+                }
+            } else {
+                // カレンダーが一つもなければ、作成を促す
+                const name = prompt('最初のカレンダーの名前を入力してください (例: 家族用):');
+                const key = prompt('カレンダーキーを入力してください:');
+                if (name && key) {
+                    calendarList.push({ name, key });
+                    calendarKey = key;
+                    localStorage.setItem('calendarList', JSON.stringify(calendarList));
+                    localStorage.setItem('activeCalendarKey', calendarKey);
+                } else {
+                    alert('カレンダーの利用には名前とキーの登録が必要です。リロードして再試行してください。');
+                }
+            }
+            renderCalendarList();
+        }
+        
+        // カレンダーキーの確認と保存
+        if (!calendarKey) {
+          calendarKey = prompt('カレンダーキーを入力してください：');
+          if (calendarKey) {
+            localStorage.setItem('calendarKey', calendarKey);
+          } else {
+            alert('キーが必要です。');
+          }
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTheme();
+            initializeCalendars();
+            createStampGrid();
+            createColorGrid();
+            createAmountGrid();
+            if (calendarKey) {
+                loadExpenses();
+            } else {
+                updateCalendar();
+                updateTotalAmount();
+            }
+        });
+
+        // Firestoreから支出データを読み込む
+        function loadExpenses() {
+            if (!calendarKey) return;
+            expenses = {}; // データを読み込む前にリセット
+            db.collection('calendars')
+              .doc(calendarKey)
+              .collection('expenses')
+              .get()
+              .then(snapshot => {
+                  snapshot.forEach(doc => {
+                      expenses[doc.id] = doc.data();
+                  });
+                  updateCalendar();
+                  updateTotalAmount();
+              });
+        }
+
+        // テーマ関連
+        function initializeTheme() {
+            var savedTheme = localStorage.getItem('theme');
+            var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (savedTheme) {
+                setTheme(savedTheme);
+            } else if (prefersDark) {
+                setTheme('dark');
+            } else {
+                setTheme('light');
+            }
+
+            // システムテーマ変更を監視
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    setTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+        }
+
+        function setTheme(theme) {
+            document.body.className = theme;
+            document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+        }
+
+        function toggleTheme() {
+            var currentTheme = document.body.className;
+            var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // カレンダー関連
+        function updateCalendar() {
+            var year = currentDate.getFullYear();
+            var month = currentDate.getMonth();
+            
+            // 月タイトル更新
+            document.getElementById('monthTitle').textContent = year + '年 ' + monthNames[month];
+            
+            // カレンダーグリッド更新
+            var calendarGrid = document.getElementById('calendarGrid');
+            calendarGrid.innerHTML = '';
+            
+            var firstDay = new Date(year, month, 1);
+            var lastDay = new Date(year, month + 1, 0);
+            var daysInMonth = lastDay.getDate();
+            var startingDayOfWeek = firstDay.getDay();
+            
+            // 前月の空白日
+            for (var i = 0; i < startingDayOfWeek; i++) {
+                var emptyDay = document.createElement('div');
+                emptyDay.className = 'calendar-day empty';
+                calendarGrid.appendChild(emptyDay);
+            }
+            
+            // 現在月の日付
+            for (var day = 1; day <= daysInMonth; day++) {
+                var dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                dayElement.onclick = (function(d) {
+                    return function() { openExpenseModal(d); };
+                })(day);
+                
+                var dayNumber = document.createElement('div');
+                dayNumber.className = 'day-number';
+                dayNumber.textContent = day;
+                dayElement.appendChild(dayNumber);
+                
+                // 支出データがある場合、スタンプやマークを表示
+                var dateKey = formatDateKey(year, month, day);
+                if (expenses[dateKey]) {
+                    const expense = expenses[dateKey];
+                    var stamp = document.createElement('div');
+                    stamp.className = 'expense-stamp';
+                    stamp.textContent = expense.stamp;
+                    stamp.style.color = expense.color;
+                    dayElement.appendChild(stamp);
+
+                    // 支払い済みの場合、チェックマークを追加
+                    if (expense.paid) {
+                        var checkmark = document.createElement('div');
+                        checkmark.className = 'paid-checkmark';
+                        checkmark.textContent = '✅';
+                        dayElement.appendChild(checkmark);
+                    }
+                }
+                
+                calendarGrid.appendChild(dayElement);
+            }
+        }
+
+        function navigateMonth(direction) {
+            currentDate.setMonth(currentDate.getMonth() + direction);
+            updateCalendar();
+        }
+
+        function formatDateKey(year, month, day) {
+            return `${year}-${month + 1}-${day}`;
+        }
+
+        // モーダル関連
+        function openExpenseModal(day) {
+            const dateKey = formatDateKey(currentDate.getFullYear(), currentDate.getMonth(), day);
+
+            // 支払い済みの場合は編集させない
+            if (expenses[dateKey] && expenses[dateKey].paid) {
+                alert('この項目は支払い済みのため編集できません。');
+                return;
+            }
+
+            selectedDate = {
+                day: day,
+                dateKey: dateKey
+            };
+            
+            document.getElementById('modalTitle').textContent = `${day}日の支出を設定`;
+            document.getElementById('expenseModal').classList.remove('hidden');
+            
+            // 既存の支出データがある場合、値を復元
+            if (expenses[selectedDate.dateKey]) {
+                const expense = expenses[selectedDate.dateKey];
+                selectedStamp = expense.stamp;
+                selectedColor = expense.color;
+                selectedAmount = expense.amount;
+            }
+            
+            updateModalSelections();
+        }
+
+        function closeExpenseModal() {
+            document.getElementById('expenseModal').classList.add('hidden');
+            showCustomAmount = false;
+            document.getElementById('customAmountInput').classList.add('hidden');
+            updateModalSelections();
+        }
+
+        function createStampGrid() {
+            var stampGrid = document.getElementById('stampGrid');
+            stamps.forEach(function(stamp) {
+                var button = document.createElement('button');
+                button.className = 'stamp-btn';
+                button.textContent = stamp;
+                button.onclick = function() { selectStamp(stamp); };
+                stampGrid.appendChild(button);
+            });
+        }
+
+        function createColorGrid() {
+            var colorGrid = document.getElementById('colorGrid');
+            colors.forEach(function(color) {
+                var button = document.createElement('button');
+                button.className = 'color-btn';
+                button.style.backgroundColor = color;
+                button.onclick = function() { selectColor(color); };
+                colorGrid.appendChild(button);
+            });
+        }
+
+        function createAmountGrid() {
+            var amountGrid = document.getElementById('amountGrid');
+            predefinedAmounts.forEach(function(amount) {
+                var button = document.createElement('button');
+                button.className = 'amount-btn';
+                button.textContent = '¥' + amount;
+                button.onclick = function() { selectAmount(amount); };
+                amountGrid.appendChild(button);
+            });
+        }
+
+        function selectStamp(stamp) {
+            selectedStamp = stamp;
+            updateModalSelections();
+        }
+
+        function selectColor(color) {
+            selectedColor = color;
+            updateModalSelections();
+        }
+
+        function selectAmount(amount) {
+            selectedAmount = amount;
+            showCustomAmount = false;
+            document.getElementById('customAmountInput').classList.add('hidden');
+            updateModalSelections();
+        }
+
+        function toggleCustomAmount() {
+            showCustomAmount = !showCustomAmount;
+            var input = document.getElementById('customAmountInput');
+            if (showCustomAmount) {
+                input.classList.remove('hidden');
+                input.focus();
+            } else {
+                input.classList.add('hidden');
+            }
+            updateModalSelections();
+        }
+
+        function updateModalSelections() {
+            // スタンプ選択状態更新
+            document.querySelectorAll('.stamp-btn').forEach(function(btn) {
+                btn.classList.toggle('selected', btn.textContent === selectedStamp);
+                if (btn.textContent === selectedStamp) {
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.color = selectedColor;
+                }
+            });
+
+            // カラー選択状態更新
+            document.querySelectorAll('.color-btn').forEach(function(btn, index) {
+                btn.classList.toggle('selected', colors[index] === selectedColor);
+            });
+
+            // 金額選択状態更新
+            document.querySelectorAll('.amount-btn').forEach(function(btn) {
+                var amount = parseInt(btn.textContent.replace('¥', ''));
+                btn.classList.toggle('selected', !showCustomAmount && amount === selectedAmount);
+            });
+
+            // カスタム金額ボタンの状態更新
+            document.querySelector('.custom-amount-btn').classList.toggle('selected', showCustomAmount);
+        }
+
+        function saveExpense() {
+            var amount = selectedAmount;
+            if (showCustomAmount) {
+                var customInput = document.getElementById('customAmountInput');
+                amount = parseInt(customInput.value) || 0;
+            }
+
+            if (amount > 0) {
+                const expenseData = {
+                    stamp: selectedStamp,
+                    color: selectedColor,
+                    amount: amount,
+                    paid: false // 支払い状態を `false` で初期化
+                };
+                expenses[selectedDate.dateKey] = expenseData;
+                
+                updateCalendar();
+                updateTotalAmount();
+                closeExpenseModal();
+
+                if (calendarKey) {
+                  db.collection('calendars')
+                    .doc(calendarKey)
+                    .collection('expenses')
+                    .doc(selectedDate.dateKey)
+                    .set(expenseData);
+                }
+            }
+        }
+
+        // 支払い関連
+        function updateTotalAmount() {
+            var total = Object.values(expenses).reduce(function(sum, expense) {
+                // `paid`がtrueでない（未払い）項目のみ合計に加える
+                return expense.paid ? sum : sum + expense.amount;
+            }, 0);
+            document.getElementById('totalAmount').textContent = '総額: ¥' + total.toLocaleString();
+            document.getElementById('paymentBtn').disabled = total === 0;
+        }
+
+        function showPaymentConfirm() {
+            document.getElementById('paymentModal').classList.remove('hidden');
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.add('hidden');
+        }
+
+        function processPayment() {
+            if (!calendarKey) {
+                closePaymentModal();
+                return;
+            }
+
+            const batch = db.batch();
+            
+            // 未払いの項目を `paid: true` に更新する
+            Object.keys(expenses).forEach(dateKey => {
+                if (!expenses[dateKey].paid) {
+                    const ref = db.collection('calendars')
+                                  .doc(calendarKey)
+                                  .collection('expenses')
+                                  .doc(dateKey);
+                    batch.update(ref, { paid: true });
+
+                    // ローカルのデータも更新
+                    expenses[dateKey].paid = true;
+                }
+            });
+
+            // Firestoreのバッチ処理を実行
+            batch.commit().then(() => {
+                console.log('Payment processed successfully.');
+                updateCalendar();
+                updateTotalAmount();
+                closePaymentModal();
+            }).catch(error => {
+                console.error("Error processing payment: ", error);
+                alert('支払処理中にエラーが発生しました。');
+                // エラーが起きた場合は、ローカルデータを再読み込みして整合性を保つ
+                loadExpenses();
+            });
+        };
+        
+                if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful: ', registration);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
