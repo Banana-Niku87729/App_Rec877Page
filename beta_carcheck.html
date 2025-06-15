@@ -768,14 +768,12 @@
         // 初期化
         document.addEventListener('DOMContentLoaded', function () {
             initializeTheme();
-            updateCalendar();
             createStampGrid();
             createColorGrid();
             createAmountGrid();
-            updateTotalAmount();
             updateCalendarList();
-        
-            // スワイプ処理
+
+            // スワイプ対応
             let startX = 0;
             document.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
@@ -787,41 +785,43 @@
                     navigateMonth(diff > 0 ? -1 : 1);
                 }
             });
-        
-            // 🔽 Firebase Auth（匿名ログイン）処理はここ！
+
+            // Firebase Auth 初期化とデータ取得
             firebase.auth().onAuthStateChanged((user) => {
                 if (user) {
                     calendarKey = user.uid;
                     localStorage.setItem('calendarKey', calendarKey);
                     document.getElementById('currentCalendarKey').textContent = calendarKey;
-            
+
+                    // 🔽 ここで初めて Firestore データを取得
                     db.collection('calendars')
-                        .doc(calendarKey)
-                        .collection('expenses')
-                        .get()
-                        .then(snapshot => {
-                            snapshot.forEach(doc => {
-                                expenses[doc.id] = doc.data();
-                            });
-            
-                            // 🔽 ココで初めて表示を更新！
-                            updateCalendar();
-                            updateTotalAmount();
-                        })
-                        .catch(err => {
-                            console.error(err);
-                            showFatalError('データ取得エラー');
+                    .doc(calendarKey)
+                    .collection('expenses')
+                    .get()
+                    .then(snapshot => {
+                        snapshot.forEach(doc => {
+                            expenses[doc.id] = doc.data();
                         });
+
+                        // ✅ データ読み込みが終わった後にカレンダー更新！
+                        updateCalendar();
+                        updateTotalAmount();
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showFatalError("Firestoreからの読み込みに失敗しました。");
+                    });
                 } else {
+                    // 未ログインなら匿名ログイン開始
                     firebase.auth().signInAnonymously()
-                        .then(() => console.log("匿名ログインOK"))
-                        .catch((error) => {
-                            console.error("ログイン失敗:", error);
+                        .then(() => console.log("匿名ログイン成功"))
+                        .catch(err => {
+                            console.error("匿名ログイン失敗:", err);
                             alert("ログインに失敗しました");
                         });
                 }
             });
-            });
+        });
 
         // テーマ関連
         function initializeTheme() {
