@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="favicon2.png">
     <title>カレンダー登録フォーム</title>
     <style>
         * {
@@ -200,7 +199,7 @@
     <script type="module">
         // Firebase設定 - 実際のプロジェクトの設定に置き換えてください
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, addDoc, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
         // Firebase設定オブジェクト（実際の値に置き換えてください）
         const firebaseConfig = {
@@ -313,9 +312,9 @@
                 throw new Error('Firebase接続エラー');
             }
 
-            const q = query(collection(db, 'calendars'), where('name', '==', calendarName));
-            const querySnapshot = await getDocs(q);
-            return !querySnapshot.empty;
+            const docRef = doc(db, 'calendars', calendarName);
+            const docSnap = await getDoc(docRef);
+            return docSnap.exists();
         }
 
         // カレンダー追加関数
@@ -324,7 +323,8 @@
                 throw new Error('Firebase接続エラー');
             }
 
-            const docRef = await addDoc(collection(db, 'calendars'), {
+            const docRef = doc(db, 'calendars', calendarName);
+            await setDoc(docRef, {
                 name: calendarName,
                 identifier: identifier,
                 ipAddress: ipAddress,
@@ -334,7 +334,7 @@
                 userAgent: navigator.userAgent
             });
             
-            return docRef.id;
+            return calendarName; // ドキュメントIDとしてカレンダー名を返す
         }
 
         // フォーム送信処理
@@ -381,7 +381,7 @@
                 // カレンダーを追加
                 const docId = await addCalendar(calendarName, identifier, ipAddress);
                 
-                showMessage(`カレンダー「${calendarName}」を正常に追加しました（ID: ${docId}）`, 'success');
+                showMessage(`カレンダー「${calendarName}」を正常に追加しました`, 'success');
                 
                 // フォームをリセット
                 form.reset();
