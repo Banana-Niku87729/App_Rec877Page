@@ -791,42 +791,37 @@
             // 🔽 Firebase Auth（匿名ログイン）処理はここ！
             firebase.auth().onAuthStateChanged((user) => {
                 if (user) {
-                    console.log("ログイン済み UID:", user.uid);
                     calendarKey = user.uid;
                     localStorage.setItem('calendarKey', calendarKey);
                     document.getElementById('currentCalendarKey').textContent = calendarKey;
-        
-                    // Firestoreから支出データ取得
+            
                     db.collection('calendars')
                         .doc(calendarKey)
                         .collection('expenses')
                         .get()
                         .then(snapshot => {
-                            if (snapshot.empty) {
-                                console.warn('カレンダー空です');
-                            } else {
-                                snapshot.forEach(doc => {
-                                    expenses[doc.id] = doc.data();
-                                });
-                                updateCalendar();
-                                updateTotalAmount();
-                            }
+                            snapshot.forEach(doc => {
+                                expenses[doc.id] = doc.data();
+                            });
+            
+                            // 🔽 ココで初めて表示を更新！
+                            updateCalendar();
+                            updateTotalAmount();
                         })
                         .catch(err => {
                             console.error(err);
-                            showFatalError('データ読み込みエラー');
+                            showFatalError('データ取得エラー');
                         });
-        
                 } else {
                     firebase.auth().signInAnonymously()
-                        .then(() => console.log("匿名ログイン成功"))
+                        .then(() => console.log("匿名ログインOK"))
                         .catch((error) => {
                             console.error("ログイン失敗:", error);
-                            alert("ログインに失敗しました。");
+                            alert("ログインに失敗しました");
                         });
                 }
             });
-        });
+            });
 
         // テーマ関連
         function initializeTheme() {
