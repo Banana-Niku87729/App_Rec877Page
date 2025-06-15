@@ -875,6 +875,9 @@
                         location.reload(); // 再度promptからやり直し
                         return;
                     }
+
+                    await updateCalendarList();
+
                 } catch (err) {
                     console.error(err);
                     showFatalError("Firestoreからの読み込みに失敗しました。");
@@ -1217,18 +1220,30 @@
         async function updateCalendarList() {
             try {
                 const list = document.getElementById('calendarList');
+                list.innerHTML = ''; // ← まず空にする
+
                 const keys = await getFromIndexedDB('calendarKeys') || [];
-                list.innerHTML = '<li>カレンダーキー: <code id="currentCalendarKey">' + (calendarKey || '') + '</code></li>';
-                
-                keys.forEach(key => {
-                    const li = document.createElement('li');
-                    const btn = document.createElement('button');
-                    btn.textContent = key;
-                    btn.className = 'calendar-switch-btn';
-                    btn.onclick = () => switchCalendar(key);
-                    li.appendChild(btn);
-                    list.appendChild(li);
-                });
+
+                // 現在のカレンダーキーを表示
+                const currentItem = document.createElement('li');
+                currentItem.innerHTML = 'カレンダーキー: <code id="currentCalendarKey">' + (calendarKey || '') + '</code>';
+                list.appendChild(currentItem);
+
+                if (keys.length === 0) {
+                    const emptyItem = document.createElement('li');
+                    emptyItem.textContent = '参加中のカレンダーがありません';
+                    list.appendChild(emptyItem);
+                } else {
+                    keys.forEach(key => {
+                        const li = document.createElement('li');
+                        const btn = document.createElement('button');
+                        btn.textContent = key;
+                        btn.className = 'calendar-switch-btn';
+                        btn.onclick = () => switchCalendar(key);
+                        li.appendChild(btn);
+                        list.appendChild(li);
+                    });
+                }
             } catch (error) {
                 console.error('カレンダーリスト更新エラー:', error);
             }
