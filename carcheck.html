@@ -723,7 +723,7 @@
         </div>
     </div>
 
-    <script>
+<script>
         // グローバル変数
         let currentDate = new Date();
         let expenses = {};
@@ -737,6 +737,7 @@
         const colors = ['#000000', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
         const predefinedAmounts = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
         const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+        
         const firebaseConfig = {
           apiKey: "AIzaSyCeP5vYhs0EMgJQL4Ayka5wx-s-ehvvmAs",
           authDomain: "carcheck-6702b.firebaseapp.com",
@@ -750,99 +751,170 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         
-        // カレンダーキーの確認と保存
-        let calendarKey = localStorage.getItem('calendarKey');
-        // 有効なキーが入力されるまでループ
-        while (!calendarKey) {
-        calendarKey = prompt('カレンダーキーを入力してください：');
-        if (calendarKey) {
-            // キーが入力されたらlocalStorageに保存してループを抜ける
-            localStorage.setItem('calendarKey', calendarKey);
-        } else {
-            // キャンセルまたは空文字の場合はアラートを表示
-            alert('カレンダーを利用するにはキーの入力が必須です。');
+        // IndexedDBの設定
+        let dbIndexed;
+        const DB_NAME = 'ExpenseCalendarDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'settings';
+
+        // IndexedDBを初期化
+        function initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    dbIndexed = request.result;
+                    resolve(dbIndexed);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+            });
         }
+
+        // IndexedDBからデータを取得
+        function getFromIndexedDB(key) {
+            return new Promise((resolve, reject) => {
+                const transaction = dbIndexed.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(key);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
         }
+
+        // IndexedDBにデータを保存
+        function setToIndexedDB(key, value) {
+            return new Promise((resolve, reject) => {
+                const transaction = dbIndexed.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(value, key);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        // IndexedDBからデータを削除
+        function removeFromIndexedDB(key) {
+            return new Promise((resolve, reject) => {
+                const transaction = dbIndexed.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.delete(key);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        let calendarKey;
 
         // 初期化
-        document.addEventListener('DOMContentLoaded', function () {
-            initializeTheme();
-            updateCalendar();
-            createStampGrid();
-            createColorGrid();
-            createAmountGrid();
-            updateTotalAmount();
-            updateCalendarList();
-
-            // スワイプ対応
-            let startX = 0;
-            document.addEventListener('touchstart', (e) => {
-                startX = e.touches[0].clientX;
-            });
-            document.addEventListener('touchend', (e) => {
-                let endX = e.changedTouches[0].clientX;
-                let diff = endX - startX;
-                if (Math.abs(diff) > 50) {
-                    if (diff > 0) {
-                        navigateMonth(-1);
+        document.addEventListener('DOMContentLoaded', async function () {
+            try {
+                await initIndexedDB();
+                
+                // IndexedDBからカレンダーキーを取得
+                calendarKey = await getFromIndexedDB('calendarKey');
+                
+                // カレンダーキーが存在しない場合は入力を求める
+                while (!calendarKey) {
+                    calendarKey = prompt('カレンダーキーを入力してください：');
+                    if (calendarKey) {
+                        await setToIndexedDB('calendarKey', calendarKey);
                     } else {
-                        navigateMonth(1);
+                        alert('カレンダーを利用するにはキーの入力が必須です。');
                     }
                 }
-            });
 
-            // 🔽 ここに追加！
-            document.addEventListener('click', function (e) {
-                const drawer = document.getElementById('drawer');
-                const toggle = document.getElementById('drawerToggle');
-                if (!drawer.contains(e.target) && e.target !== toggle) {
-                    drawer.style.left = '-300px';
+                initializeTheme();
+                createStampGrid();
+                createColorGrid();
+                createAmountGrid();
+                updateCalendarList();
+
+                // スワイプ対応
+                let startX = 0;
+                document.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX;
+                });
+                document.addEventListener('touchend', (e) => {
+                    let endX = e.changedTouches[0].clientX;
+                    let diff = endX - startX;
+                    if (Math.abs(diff) > 50) {
+                        navigateMonth(diff > 0 ? -1 : 1);
+                    }
+                });
+
+                // Firestore データを取得（Firebase Auth不要）
+                let calendarExists = false;
+
+                try {
+                    const snapshot = await db.collection('calendars')
+                        .doc(calendarKey)
+                        .collection('expenses')
+                        .get();
+
+                    calendarExists = !snapshot.empty;
+
+                    if (calendarExists) {
+                        snapshot.forEach(doc => {
+                            expenses[doc.id] = doc.data();
+                        });
+                        updateCalendar();
+                        updateTotalAmount();
+                    } else {
+                        alert('入力したキーが見つかりません。');
+                        await removeFromIndexedDB('calendarKey');
+                        location.reload(); // 再度promptからやり直し
+                        return;
+                    }
+
+                    await updateCalendarList();
+
+                } catch (err) {
+                    console.error(err);
+                    showFatalError("Firestoreからの読み込みに失敗しました。");
                 }
-            });
 
-            // Firebaseからデータ取得
-            if (calendarKey) {
-                db.collection('calendars')
-                    .doc(calendarKey)
-                    .collection('expenses')
-                    .get()
-                    .then(snapshot => {
-                        if (snapshot.empty) {
-                            showFatalError('指定されたカレンダーは存在しません。');
-                        } else {
-                            snapshot.forEach(doc => {
-                                expenses[doc.id] = doc.data();
-                            });
-                            updateCalendar();
-                            updateTotalAmount();
-                        }
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        showFatalError('カレンダーデータの取得中にエラーが発生しました。');
-                    });
+            } catch (error) {
+                console.error('IndexedDB初期化エラー:', error);
+                alert('データベースの初期化に失敗しました。');
             }
         });
 
         // テーマ関連
-        function initializeTheme() {
-            var savedTheme = localStorage.getItem('theme');
-            var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            
-            if (savedTheme) {
-                setTheme(savedTheme);
-            } else if (prefersDark) {
-                setTheme('dark');
-            } else {
+        async function initializeTheme() {
+            try {
+                var savedTheme = await getFromIndexedDB('theme');
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                
+                if (savedTheme) {
+                    setTheme(savedTheme);
+                } else if (prefersDark) {
+                    setTheme('dark');
+                } else {
+                    setTheme('light');
+                }
+
+                // システムテーマ変更を監視
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                    getFromIndexedDB('theme').then(theme => {
+                        if (!theme) {
+                            setTheme(e.matches ? 'dark' : 'light');
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('テーマ初期化エラー:', error);
                 setTheme('light');
             }
-
-            // システムテーマ変更を監視
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                if (!localStorage.getItem('theme')) {
-                    setTheme(e.matches ? 'dark' : 'light');
-                }
-            });
         }
 
         function setTheme(theme) {
@@ -850,77 +922,69 @@
             document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
         }
 
-        function toggleTheme() {
-            var currentTheme = document.body.className;
-            var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            setTheme(newTheme);
-            localStorage.setItem('theme', newTheme);
+        async function toggleTheme() {
+            try {
+                var currentTheme = document.body.className;
+                var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+                await setToIndexedDB('theme', newTheme);
+            } catch (error) {
+                console.error('テーマ保存エラー:', error);
+            }
         }
 
         // カレンダー関連
         function updateCalendar() {
             var year = currentDate.getFullYear();
             var month = currentDate.getMonth();
-            
-            // 月タイトル更新
+
             document.getElementById('monthTitle').textContent = year + '年 ' + monthNames[month];
-            
-            // カレンダーグリッド更新
+
             var calendarGrid = document.getElementById('calendarGrid');
             calendarGrid.innerHTML = '';
-            
+
             var firstDay = new Date(year, month, 1);
             var lastDay = new Date(year, month + 1, 0);
             var daysInMonth = lastDay.getDate();
             var startingDayOfWeek = firstDay.getDay();
-            
-            // 前月の空白日
+
+            // 空白
             for (var i = 0; i < startingDayOfWeek; i++) {
                 var emptyDay = document.createElement('div');
                 emptyDay.className = 'calendar-day empty';
                 calendarGrid.appendChild(emptyDay);
             }
-            
-            // 現在月の日付
+
             for (var day = 1; day <= daysInMonth; day++) {
                 var dayElement = document.createElement('div');
                 dayElement.className = 'calendar-day';
-                dayElement.onclick = (function(d) {
-                    return function() { openExpenseModal(d); };
+                dayElement.onclick = (function (d) {
+                    return function () { openExpenseModal(d); };
                 })(day);
-                
+
                 var dayNumber = document.createElement('div');
                 dayNumber.className = 'day-number';
                 dayNumber.textContent = day;
                 dayElement.appendChild(dayNumber);
-                
-                // 支出データがある場合、スタンプを表示
-                var dateKey = formatDateKey(year, month, day);
-                if (expenses[dateKey]) {
-                    var stamp = document.createElement('div');
-                    stamp.className = 'expense-stamp';
-                    stamp.textContent = expenses[dateKey].stamp;
-                    stamp.style.color = expenses[dateKey].color;
-                    dayElement.appendChild(stamp);
-                }
 
-                if (expenses[dateKey]) {
+                var dateKey = formatDateKey(year, month, day);
                 const data = expenses[dateKey];
 
-                const stamp = document.createElement('div');
-                stamp.className = 'expense-stamp';
-                stamp.textContent = data.stamp;
-                stamp.style.color = data.color;
-                dayElement.appendChild(stamp);
+                if (data) {
+                    const stamp = document.createElement('div');
+                    stamp.className = 'expense-stamp';
+                    stamp.textContent = data.stamp;
+                    stamp.style.color = data.color;
+                    dayElement.appendChild(stamp);
 
-                if (data.paid) {
-                    const check = document.createElement('div');
-                    check.className = 'paid-check';
-                    check.textContent = '✔';
-                    dayElement.appendChild(check);
+                    if (data.paid) {
+                        const check = document.createElement('div');
+                        check.className = 'paid-check';
+                        check.textContent = '✔';
+                        dayElement.appendChild(check);
+                    }
                 }
-                }
-                
+
                 calendarGrid.appendChild(dayElement);
             }
         }
@@ -1067,18 +1131,20 @@
                 updateCalendar();
                 updateTotalAmount();
                 closeExpenseModal();
-            }
-            if (calendarKey) {
-                  db.collection('calendars')
-                    .doc(calendarKey)
-                    .collection('expenses')
-                    .doc(selectedDate.dateKey)
-                    .set({
-                      stamp: selectedStamp,
-                      color: selectedColor,
-                      amount: amount
-                    });
+
+                // Firebase Firestoreに保存
+                if (calendarKey) {
+                    db.collection('calendars')
+                      .doc(calendarKey)
+                      .collection('expenses')
+                      .doc(selectedDate.dateKey)
+                      .set({
+                        stamp: selectedStamp,
+                        color: selectedColor,
+                        amount: amount
+                      });
                 }
+            }
         }
 
         // 支払い関連
@@ -1103,7 +1169,7 @@
                 const batch = db.batch();
                 Object.keys(expenses).forEach(dateKey => {
                     expenses[dateKey].paid = true;
-                    expenses[dateKey].amount = 0; // ← ここを追加
+                    expenses[dateKey].amount = 0;
                     const ref = db.collection('calendars')
                                 .doc(calendarKey)
                                 .collection('expenses')
@@ -1118,8 +1184,7 @@
             }
         }
 
-        
-                if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').then(registration => {
                     console.log('ServiceWorker registration successful: ', registration);
@@ -1135,42 +1200,72 @@
             document.getElementById('currentCalendarKey').textContent = calendarKey || '未設定';
         }
 
-        function joinCalendar() {
-            const newKey = prompt('参加したいカレンダーキーを入力:');
-            if (newKey) {
-                // 既存の履歴も取得
-                let keys = JSON.parse(localStorage.getItem('calendarKeys') || '[]');
-                if (!keys.includes(newKey)) keys.push(newKey);
-                localStorage.setItem('calendarKeys', JSON.stringify(keys));
-                localStorage.setItem('calendarKey', newKey);
-                location.reload();
+        async function joinCalendar() {
+            try {
+                const newKey = prompt('参加したいカレンダーキーを入力:');
+                if (newKey) {
+                    // 既存の履歴も取得
+                    let keys = await getFromIndexedDB('calendarKeys') || [];
+                    if (!keys.includes(newKey)) keys.push(newKey);
+                    await setToIndexedDB('calendarKeys', keys);
+                    await setToIndexedDB('calendarKey', newKey);
+                    location.reload();
+                }
+            } catch (error) {
+                console.error('カレンダー参加エラー:', error);
+                alert('カレンダーへの参加に失敗しました。');
             }
         }
 
-        function updateCalendarList() {
-            const list = document.getElementById('calendarList');
-            const keys = JSON.parse(localStorage.getItem('calendarKeys') || '[]');
-            list.innerHTML = '<li>カレンダーキー: <code id="currentCalendarKey">' + (calendarKey || '') + '</code></li>';
-            
-            keys.forEach(key => {
-                const li = document.createElement('li');
-                const btn = document.createElement('button');
-                btn.textContent = key;
-                btn.className = 'calendar-switch-btn';
-                btn.onclick = () => switchCalendar(key);
-                li.appendChild(btn);
-                list.appendChild(li);
-            });
+        async function updateCalendarList() {
+            try {
+                const list = document.getElementById('calendarList');
+                list.innerHTML = ''; // ← まず空にする
+
+                const keys = await getFromIndexedDB('calendarKeys') || [];
+
+                // 現在のカレンダーキーを表示
+                const currentItem = document.createElement('li');
+                currentItem.innerHTML = 'カレンダーキー: <code id="currentCalendarKey">' + (calendarKey || '') + '</code>';
+                list.appendChild(currentItem);
+
+                if (keys.length === 0) {
+                    const emptyItem = document.createElement('li');
+                    emptyItem.textContent = '参加中のカレンダーがありません';
+                    list.appendChild(emptyItem);
+                } else {
+                    keys.forEach(key => {
+                        const li = document.createElement('li');
+                        const btn = document.createElement('button');
+                        btn.textContent = key;
+                        btn.className = 'calendar-switch-btn';
+                        btn.onclick = () => switchCalendar(key);
+                        li.appendChild(btn);
+                        list.appendChild(li);
+                    });
+                }
+            } catch (error) {
+                console.error('カレンダーリスト更新エラー:', error);
+            }
         }
 
-        function switchCalendar(key) {
-            localStorage.setItem('calendarKey', key);
-            location.reload();
+        async function switchCalendar(key) {
+            try {
+                await setToIndexedDB('calendarKey', key);
+                location.reload();
+            } catch (error) {
+                console.error('カレンダー切り替えエラー:', error);
+                alert('カレンダーの切り替えに失敗しました。');
+            }
         }
 
-        function showFatalError(message) {
+        async function showFatalError(message) {
             alert(message + '\nカレンダーキーをクリアしてリロードします。');
-            localStorage.removeItem('calendarKey');
+            try {
+                await removeFromIndexedDB('calendarKey');
+            } catch (error) {
+                console.error('データクリアエラー:', error);
+            }
             location.reload();
         }
     </script>
