@@ -175,7 +175,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>📅 カレンダーキー登録</h1>
+        <h1>📅 カレンダー登録</h1>
         
         <div id="firebaseStatus" class="firebase-status disconnected">
             Firebase接続を初期化中...
@@ -323,8 +323,9 @@
                 throw new Error('Firebase接続エラー');
             }
 
-            const docRef = doc(db, 'calendars', calendarName);
-            await setDoc(docRef, {
+            // メインのカレンダードキュメントを作成
+            const calendarDocRef = doc(db, 'calendars', calendarName);
+            await setDoc(calendarDocRef, {
                 name: calendarName,
                 identifier: identifier,
                 ipAddress: ipAddress,
@@ -333,8 +334,46 @@
                 timestamp: Date.now(),
                 userAgent: navigator.userAgent
             });
+
+            // サブコレクション 'expenses' にサンプルデータを追加
+            const expensesCollectionRef = collection(calendarDocRef, 'expenses');
             
-            return calendarName; // ドキュメントIDとしてカレンダー名を返す
+            // サンプル支出データを複数追加
+            const sampleExpenses = [
+                {
+                    title: '食費',
+                    amount: 1500,
+                    category: '食事',
+                    date: new Date(),
+                    description: 'ランチ代',
+                    createdAt: new Date()
+                },
+                {
+                    title: '交通費',
+                    amount: 300,
+                    category: '交通',
+                    date: new Date(Date.now() - 24 * 60 * 60 * 1000), // 昨日
+                    description: '電車賃',
+                    createdAt: new Date()
+                },
+                {
+                    title: 'コーヒー',
+                    amount: 450,
+                    category: '飲み物',
+                    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2日前
+                    description: 'カフェでのコーヒー',
+                    createdAt: new Date()
+                }
+            ];
+
+            // 各サンプル支出を追加
+            const expensePromises = sampleExpenses.map(expense => 
+                addDoc(expensesCollectionRef, expense)
+            );
+            
+            await Promise.all(expensePromises);
+            
+            return calendarName;
         }
 
         // フォーム送信処理
@@ -381,7 +420,7 @@
                 // カレンダーを追加
                 const docId = await addCalendar(calendarName, identifier, ipAddress);
                 
-                showMessage(`カレンダー「${calendarName}」を正常に追加しました`, 'success');
+                showMessage(`カレンダー「${calendarName}」とサンプル支出データを正常に追加しました`, 'success');
                 
                 // フォームをリセット
                 form.reset();
