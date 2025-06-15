@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <link rel="icon" href="favicon2.png">
     <link rel="manifest" href="manifest.json">
     <title>支出管理カレンダー</title>
@@ -543,6 +544,38 @@
             color: #10b981;
         }
 
+        .calendar-switch-btn {
+            width: 100%;
+            padding: 8px 12px;
+            margin-top: 4px;
+            font-size: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+
+        /* ライトモード */
+        .light .calendar-switch-btn {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+
+        .light .calendar-switch-btn:hover {
+            background-color: #d1d5db;
+        }
+
+        /* ダークモード */
+        .dark .calendar-switch-btn {
+            background-color: #374151;
+            color: #ffffff;
+        }
+
+        .dark .calendar-switch-btn:hover {
+            background-color: #4b5563;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 16px 8px;
@@ -741,8 +774,8 @@
             createAmountGrid();
             updateTotalAmount();
             updateCalendarList();
-
-            // スワイプ対応
+        
+            // スワイプ処理
             let startX = 0;
             document.addEventListener('touchstart', (e) => {
                 startX = e.touches[0].clientX;
@@ -751,45 +784,48 @@
                 let endX = e.changedTouches[0].clientX;
                 let diff = endX - startX;
                 if (Math.abs(diff) > 50) {
-                    if (diff > 0) {
-                        navigateMonth(-1);
-                    } else {
-                        navigateMonth(1);
-                    }
+                    navigateMonth(diff > 0 ? -1 : 1);
                 }
             });
-
-            // 🔽 ここに追加！
-            document.addEventListener('click', function (e) {
-                const drawer = document.getElementById('drawer');
-                const toggle = document.getElementById('drawerToggle');
-                if (!drawer.contains(e.target) && e.target !== toggle) {
-                    drawer.style.left = '-300px';
+        
+            // 🔽 Firebase Auth（匿名ログイン）処理はここ！
+            firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    console.log("ログイン済み UID:", user.uid);
+                    calendarKey = user.uid;
+                    localStorage.setItem('calendarKey', calendarKey);
+                    document.getElementById('currentCalendarKey').textContent = calendarKey;
+        
+                    // Firestoreから支出データ取得
+                    db.collection('calendars')
+                        .doc(calendarKey)
+                        .collection('expenses')
+                        .get()
+                        .then(snapshot => {
+                            if (snapshot.empty) {
+                                console.warn('カレンダー空です');
+                            } else {
+                                snapshot.forEach(doc => {
+                                    expenses[doc.id] = doc.data();
+                                });
+                                updateCalendar();
+                                updateTotalAmount();
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            showFatalError('データ読み込みエラー');
+                        });
+        
+                } else {
+                    firebase.auth().signInAnonymously()
+                        .then(() => console.log("匿名ログイン成功"))
+                        .catch((error) => {
+                            console.error("ログイン失敗:", error);
+                            alert("ログインに失敗しました。");
+                        });
                 }
             });
-
-            // Firebaseからデータ取得
-            if (calendarKey) {
-                db.collection('calendars')
-                    .doc(calendarKey)
-                    .collection('expenses')
-                    .get()
-                    .then(snapshot => {
-                        if (snapshot.empty) {
-                            showFatalError('指定されたカレンダーは存在しません。');
-                        } else {
-                            snapshot.forEach(doc => {
-                                expenses[doc.id] = doc.data();
-                            });
-                            updateCalendar();
-                            updateTotalAmount();
-                        }
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        showFatalError('カレンダーデータの取得中にエラーが発生しました。');
-                    });
-            }
         });
 
         // テーマ関連
@@ -1118,9 +1154,17 @@
         function updateCalendarList() {
             const list = document.getElementById('calendarList');
             const keys = JSON.parse(localStorage.getItem('calendarKeys') || '[]');
-            list.innerHTML = keys.map(key => `
-                <li><button onclick="switchCalendar('${key}')">${key}</button></li>
-            `).join('');
+            list.innerHTML = '<li>カレンダーキー: <code id="currentCalendarKey">' + (calendarKey || '') + '</code></li>';
+            
+            keys.forEach(key => {
+                const li = document.createElement('li');
+                const btn = document.createElement('button');
+                btn.textContent = key;
+                btn.className = 'calendar-switch-btn';
+                btn.onclick = () => switchCalendar(key);
+                li.appendChild(btn);
+                list.appendChild(li);
+            });
         }
 
         function switchCalendar(key) {
