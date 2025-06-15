@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カレンダー登録フォーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 1rem;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn.cooldown {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffa726 100%);
+            cursor: not-allowed;
+        }
+
+        .cooldown-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 8px;
+            color: #f57c00;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-weight: 500;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .message.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .message.success {
+            background: rgba(76, 175, 80, 0.1);
+            color: #2e7d32;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .message.error {
+            background: rgba(244, 67, 54, 0.1);
+            color: #c62828;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .firebase-status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .firebase-status.connected {
+            background: rgba(76, 175, 80, 0.1);
+            color: #2e7d32;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .firebase-status.disconnected {
+            background: rgba(244, 67, 54, 0.1);
+            color: #c62828;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 カレンダー登録</h1>
+        
+        <div id="firebaseStatus" class="firebase-status disconnected">
+            Firebase接続を初期化中...
+        </div>
+
+        <form id="calendarForm">
+            <div class="form-group">
+                <label for="calendarName">カレンダー名:</label>
+                <input type="text" id="calendarName" name="calendarName" required placeholder="カレンダー名を入力してください">
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                追加する
+            </button>
+        </form>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Firebase設定 - 実際のプロジェクトの設定に置き換えてください
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase設定オブジェクト（実際の値に置き換えてください）
+        const firebaseConfig = {
+          apiKey: "AIzaSyCeP5vYhs0EMgJQL4Ayka5wx-s-ehvvmAs",
+          authDomain: "carcheck-6702b.firebaseapp.com",
+          projectId: "carcheck-6702b",
+          storageBucket: "carcheck-6702b.firebasestorage.app",
+          messagingSenderId: "985992635268",
+          appId: "1:985992635268:web:8a1d5c0469d4ee563eb3d1",
+          measurementId: "G-YMMZJPYL64"
+        };
+
+        // Firebase初期化
+        let app, db;
+        let isFirebaseConnected = false;
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            isFirebaseConnected = true;
+            updateFirebaseStatus(true);
+        } catch (error) {
+            console.error('Firebase初期化エラー:', error);
+            updateFirebaseStatus(false);
+        }
+
+        function updateFirebaseStatus(connected) {
+            const statusEl = document.getElementById('firebaseStatus');
+            if (connected) {
+                statusEl.textContent = '✅ Firebase接続済み';
+                statusEl.className = 'firebase-status connected';
+            } else {
+                statusEl.textContent = '❌ Firebase未接続（設定を確認してください）';
+                statusEl.className = 'firebase-status disconnected';
+            }
+        }
+
+        // フォーム要素の取得
+        const form = document.getElementById('calendarForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const messageEl = document.getElementById('message');
+
+        // メッセージ表示関数
+        function showMessage(text, type) {
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.classList.add('show');
+            
+            setTimeout(() => {
+                messageEl.classList.remove('show');
+            }, 5000);
+        }
+
+        // デバイスIDを生成または取得
+        function getDeviceId() {
+            let deviceId = localStorage.getItem('deviceId');
+            if (!deviceId) {
+                deviceId = 'device_' + Math.random().toString(36).substr(2, 16) + '_' + Date.now();
+                localStorage.setItem('deviceId', deviceId);
+            }
+            return deviceId;
+        }
+
+        // IPアドレスを取得（フォールバック付き）
+        async function getClientIP() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
+                console.warn('IP取得エラー、デバイスIDを使用:', error);
+                return null;
+            }
+        }
+
+        // クールダウンチェック関数
+        async function checkCooldown(identifier) {
+            if (!isFirebaseConnected) {
+                throw new Error('Firebase接続エラー');
+            }
+
+            const now = Date.now();
+            const fiveMinutesAgo = now - (5 * 60 * 1000); // 5分前のタイムスタンプ
+            
+            const q = query(
+                collection(db, 'calendars'), 
+                where('identifier', '==', identifier),
+                where('timestamp', '>', fiveMinutesAgo)
+            );
+            
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                const lastDoc = querySnapshot.docs[0];
+                const lastTimestamp = lastDoc.data().timestamp;
+                const remainingTime = Math.ceil((lastTimestamp + (5 * 60 * 1000) - now) / 1000);
+                return { 
+                    isInCooldown: true, 
+                    remainingSeconds: remainingTime,
+                    remainingMinutes: Math.ceil(remainingTime / 60)
+                };
+            }
+            
+            return { isInCooldown: false };
+        }
+
+        // 重複チェック関数
+        async function checkDuplicate(calendarName) {
+            if (!isFirebaseConnected) {
+                throw new Error('Firebase接続エラー');
+            }
+
+            const q = query(collection(db, 'calendars'), where('name', '==', calendarName));
+            const querySnapshot = await getDocs(q);
+            return !querySnapshot.empty;
+        }
+
+        // カレンダー追加関数
+        async function addCalendar(calendarName, identifier, ipAddress) {
+            if (!isFirebaseConnected) {
+                throw new Error('Firebase接続エラー');
+            }
+
+            const docRef = await addDoc(collection(db, 'calendars'), {
+                name: calendarName,
+                identifier: identifier,
+                ipAddress: ipAddress,
+                deviceId: getDeviceId(),
+                createdAt: new Date(),
+                timestamp: Date.now(),
+                userAgent: navigator.userAgent
+            });
+            
+            return docRef.id;
+        }
+
+        // フォーム送信処理
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const calendarName = document.getElementById('calendarName').value.trim();
+            
+            if (!calendarName) {
+                showMessage('カレンダー名を入力してください', 'error');
+                return;
+            }
+
+            if (!isFirebaseConnected) {
+                showMessage('Firebase接続エラー：設定を確認してください', 'error');
+                return;
+            }
+
+            // ボタンを無効化してローディング表示
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '処理中...<span class="loading"></span>';
+
+            try {
+                // IP アドレスとデバイス ID を取得
+                const ipAddress = await getClientIP();
+                const deviceId = getDeviceId();
+                const identifier = ipAddress || deviceId; // IP が取得できない場合はデバイス ID を使用
+
+                // クールダウンチェック
+                const cooldownResult = await checkCooldown(identifier);
+                if (cooldownResult.isInCooldown) {
+                    showMessage(`クールダウン中です。あと ${cooldownResult.remainingMinutes} 分お待ちください`, 'error');
+                    return;
+                }
+
+                // 重複チェック
+                const isDuplicate = await checkDuplicate(calendarName);
+                
+                if (isDuplicate) {
+                    showMessage('エラー：同じ名前のカレンダーが既に存在します', 'error');
+                    return;
+                }
+
+                // カレンダーを追加
+                const docId = await addCalendar(calendarName, identifier, ipAddress);
+                
+                showMessage(`カレンダー「${calendarName}」を正常に追加しました（ID: ${docId}）`, 'success');
+                
+                // フォームをリセット
+                form.reset();
+
+                // クールダウンタイマー開始
+                startCooldownTimer();
+
+            } catch (error) {
+                console.error('エラー:', error);
+                showMessage(`エラーが発生しました: ${error.message}`, 'error');
+            } finally {
+                // ボタンを有効化
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '追加する';
+            }
+        });
+
+        // クールダウンタイマー
+        function startCooldownTimer() {
+            let remainingSeconds = 300; // 5分 = 300秒
+            
+            const updateButton = () => {
+                if (remainingSeconds > 0) {
+                    const minutes = Math.floor(remainingSeconds / 60);
+                    const seconds = remainingSeconds % 60;
+                    submitBtn.innerHTML = `クールダウン中 (${minutes}:${seconds.toString().padStart(2, '0')})`;
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('cooldown');
+                    remainingSeconds--;
+                    setTimeout(updateButton, 1000);
+                } else {
+                    submitBtn.innerHTML = '追加する';
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('cooldown');
+                }
+            };
+            
+            updateButton();
+        }
+
+        // ページ読み込み時に既存のクールダウンをチェック
+        window.addEventListener('load', async () => {
+            if (!isFirebaseConnected) return;
+            
+            try {
+                const ipAddress = await getClientIP();
+                const deviceId = getDeviceId();
+                const identifier = ipAddress || deviceId;
+                
+                const cooldownResult = await checkCooldown(identifier);
+                if (cooldownResult.isInCooldown) {
+                    let remainingSeconds = cooldownResult.remainingSeconds;
+                    
+                    const updateButton = () => {
+                        if (remainingSeconds > 0) {
+                            const minutes = Math.floor(remainingSeconds / 60);
+                            const seconds = remainingSeconds % 60;
+                            submitBtn.innerHTML = `クールダウン中 (${minutes}:${seconds.toString().padStart(2, '0')})`;
+                            submitBtn.disabled = true;
+                            submitBtn.classList.add('cooldown');
+                            remainingSeconds--;
+                            setTimeout(updateButton, 1000);
+                        } else {
+                            submitBtn.innerHTML = '追加する';
+                            submitBtn.disabled = false;
+                            submitBtn.classList.remove('cooldown');
+                        }
+                    };
+                    
+                    updateButton();
+                }
+            } catch (error) {
+                console.error('クールダウンチェックエラー:', error);
+            }
+        });
+
+        // 入力フィールドのリアルタイム検証
+        document.getElementById('calendarName').addEventListener('input', (e) => {
+            const value = e.target.value.trim();
+            if (value && messageEl.classList.contains('show')) {
+                messageEl.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
