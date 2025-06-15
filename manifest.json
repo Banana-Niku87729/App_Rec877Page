@@ -1,0 +1,21 @@
+{
+  "name": "支出管理カレンダー",
+  "short_name": "支出カレンダー",
+  "start_url": "/carcheck.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1f2937",
+  "description": "日々の支出を管理するためのカレンダーアプリ",
+  "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
