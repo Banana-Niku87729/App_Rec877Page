@@ -476,6 +476,14 @@
             display: none;
         }
 
+        .paid-check {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            font-size: 16px;
+            color: #10b981;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 16px 8px;
@@ -505,126 +513,25 @@
                 grid-template-columns: 1fr;
             }
         }
-
-        /* ドロワー関連のスタイル */
-        .drawer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100%;
-            width: 300px;
-            max-width: 80vw;
-            transition: transform 0.3s ease-in-out;
-            z-index: 1100;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .drawer.hidden {
-            transform: translateX(-100%);
-        }
-
-        .light .drawer {
-            background-color: #f8fafc;
-            border-right: 1px solid #e5e7eb;
-        }
-
-        .dark .drawer {
-            background-color: #111827;
-            border-right: 1px solid #374151;
-        }
-        
-        .drawer-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .dark .drawer-header {
-            border-bottom: 1px solid #374151;
-        }
-
-        .drawer-header h2 {
-            font-size: 18px;
-        }
-
-        .calendar-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            flex-grow: 1;
-            overflow-y: auto;
-        }
-        
-        .calendar-list li {
-            padding: 16px;
-            cursor: pointer;
-            border-bottom: 1px solid #e5e7eb;
-            font-weight: 500;
-        }
-        .dark .calendar-list li {
-            border-bottom: 1px solid #374151;
-        }
-
-        .light .calendar-list li:hover {
-            background-color: #f3f4f6;
-        }
-        .dark .calendar-list li:hover {
-            background-color: #374151;
-        }
-
-        .calendar-list li.active {
-            font-weight: bold;
-        }
-        .light .calendar-list li.active {
-            background-color: #e0e7ff;
-            color: #3730a3;
-        }
-        .dark .calendar-list li.active {
-            background-color: #312e81;
-            color: #e0e7ff;
-        }
-
-        .drawer-footer {
-            padding: 16px;
-            border-top: 1px solid #e5e7eb;
-        }
-        .dark .drawer-footer {
-            border-top: 1px solid #374151;
-        }
-
-        .drawer-footer .modal-btn {
-            width: 100%;
-        }
-
-        /* 支払い済みチェックマーク */
-        .paid-checkmark {
-            position: absolute;
-            top: 4px; /* スタンプより少し上 */
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 16px;
-            color: #10b981; /* 緑色 */
-        }
-
-        .hidden {
-            display: none;
-        }
     </style>
 </head>
 <body class="light">
     <div class="container">
         <!-- ヘッダー -->
         <div class="header">
-            <div style="display: flex; align-items: center; gap: 16px;">
-                <button class="nav-btn" onclick="toggleDrawer()">☰</button>
+            <button onclick="toggleDrawer()" style="font-size: 20px;">📂</button>
             <h1 class="title">
                 📅 支出管理カレンダー
             </h1>
             <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
                 🌙
             </button>
+        </div>
+
+        <div id="drawer" style="position:fixed; top:0; left:-300px; width:300px; height:100%; background:#f3f4f6; box-shadow:2px 0 8px rgba(0,0,0,0.2); transition:left 0.3s; padding:16px; z-index:2000;">
+            <h3 style="margin-bottom:16px;">参加中のカレンダー</h3>
+            <ul id="calendarList"></ul>
+            <button onclick="joinCalendar()" style="position:absolute; bottom:16px; left:16px; right:16px; padding:8px; background:#3b82f6; color:#fff; border:none; border-radius:8px;">参加</button>
         </div>
 
         <!-- カレンダーナビゲーション -->
@@ -721,18 +628,6 @@
         </div>
     </div>
 
-    <div class="drawer hidden" id="drawer">
-        <div class="drawer-header">
-            <h2>カレンダーリスト</h2>
-            <button class="nav-btn" onclick="toggleDrawer()">×</button>
-        </div>
-        <ul class="calendar-list" id="calendarList">
-            </ul>
-        <div class="drawer-footer">
-            <button class="modal-btn primary" onclick="joinNewCalendar()">新しいカレンダーに参加</button>
-        </div>
-    </div>
-
     <script>
         // グローバル変数
         let currentDate = new Date();
@@ -742,8 +637,6 @@
         let selectedColor = '#000000';
         let selectedAmount = 100;
         let showCustomAmount = false;
-        let calendarKey = null; // 現在アクティブなカレンダーのキー
-        let calendarList = []; // 保存されているカレンダーのリスト
 
         const stamps = ['💰', '🛒', '🍔', '☕', '🚗', '🏠', '💊', '📚', '🎬', '👕', '⚡', '📱'];
         const colors = ['#000000', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
@@ -761,39 +654,9 @@
         
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-
-        function initializeCalendars() {
-            const storedList = localStorage.getItem('calendarList');
-            if (storedList) {
-                calendarList = JSON.parse(storedList);
-            }
-            
-            let activeKey = localStorage.getItem('activeCalendarKey');
-            
-            if (calendarList.length > 0) {
-                if (activeKey && calendarList.some(c => c.key === activeKey)) {
-                    calendarKey = activeKey;
-                } else {
-                    calendarKey = calendarList[0].key; // アクティブキーがなければリストの先頭を使う
-                    localStorage.setItem('activeCalendarKey', calendarKey);
-                }
-            } else {
-                // カレンダーが一つもなければ、作成を促す
-                const name = prompt('最初のカレンダーの名前を入力してください (例: 家族用):');
-                const key = prompt('カレンダーキーを入力してください:');
-                if (name && key) {
-                    calendarList.push({ name, key });
-                    calendarKey = key;
-                    localStorage.setItem('calendarList', JSON.stringify(calendarList));
-                    localStorage.setItem('activeCalendarKey', calendarKey);
-                } else {
-                    alert('カレンダーの利用には名前とキーの登録が必要です。リロードして再試行してください。');
-                }
-            }
-            renderCalendarList();
-        }
         
         // カレンダーキーの確認と保存
+        let calendarKey = localStorage.getItem('calendarKey');
         if (!calendarKey) {
           calendarKey = prompt('カレンダーキーを入力してください：');
           if (calendarKey) {
@@ -806,34 +669,25 @@
         // 初期化
         document.addEventListener('DOMContentLoaded', function() {
             initializeTheme();
-            initializeCalendars();
+            updateCalendar();
             createStampGrid();
             createColorGrid();
             createAmountGrid();
+            updateTotalAmount();
             if (calendarKey) {
-                loadExpenses();
-            } else {
-                updateCalendar();
-                updateTotalAmount();
-            }
-        });
-
-        // Firestoreから支出データを読み込む
-        function loadExpenses() {
-            if (!calendarKey) return;
-            expenses = {}; // データを読み込む前にリセット
-            db.collection('calendars')
-              .doc(calendarKey)
-              .collection('expenses')
-              .get()
-              .then(snapshot => {
+              db.collection('calendars')
+                .doc(calendarKey)
+                .collection('expenses')
+                .get()
+                .then(snapshot => {
                   snapshot.forEach(doc => {
-                      expenses[doc.id] = doc.data();
+                    expenses[doc.id] = doc.data();
                   });
                   updateCalendar();
                   updateTotalAmount();
-              });
-        }
+                });
+            };
+        });
 
         // テーマ関連
         function initializeTheme() {
@@ -905,23 +759,31 @@
                 dayNumber.textContent = day;
                 dayElement.appendChild(dayNumber);
                 
-                // 支出データがある場合、スタンプやマークを表示
+                // 支出データがある場合、スタンプを表示
                 var dateKey = formatDateKey(year, month, day);
                 if (expenses[dateKey]) {
-                    const expense = expenses[dateKey];
                     var stamp = document.createElement('div');
                     stamp.className = 'expense-stamp';
-                    stamp.textContent = expense.stamp;
-                    stamp.style.color = expense.color;
+                    stamp.textContent = expenses[dateKey].stamp;
+                    stamp.style.color = expenses[dateKey].color;
                     dayElement.appendChild(stamp);
+                }
 
-                    // 支払い済みの場合、チェックマークを追加
-                    if (expense.paid) {
-                        var checkmark = document.createElement('div');
-                        checkmark.className = 'paid-checkmark';
-                        checkmark.textContent = '✅';
-                        dayElement.appendChild(checkmark);
-                    }
+                if (expenses[dateKey]) {
+                const data = expenses[dateKey];
+
+                const stamp = document.createElement('div');
+                stamp.className = 'expense-stamp';
+                stamp.textContent = data.stamp;
+                stamp.style.color = data.color;
+                dayElement.appendChild(stamp);
+
+                if (data.paid) {
+                    const check = document.createElement('div');
+                    check.className = 'paid-check';
+                    check.textContent = '✔';
+                    dayElement.appendChild(check);
+                }
                 }
                 
                 calendarGrid.appendChild(dayElement);
@@ -939,17 +801,9 @@
 
         // モーダル関連
         function openExpenseModal(day) {
-            const dateKey = formatDateKey(currentDate.getFullYear(), currentDate.getMonth(), day);
-
-            // 支払い済みの場合は編集させない
-            if (expenses[dateKey] && expenses[dateKey].paid) {
-                alert('この項目は支払い済みのため編集できません。');
-                return;
-            }
-
             selectedDate = {
                 day: day,
-                dateKey: dateKey
+                dateKey: formatDateKey(currentDate.getFullYear(), currentDate.getMonth(), day)
             };
             
             document.getElementById('modalTitle').textContent = `${day}日の支出を設定`;
@@ -1069,33 +923,33 @@
             }
 
             if (amount > 0) {
-                const expenseData = {
+                expenses[selectedDate.dateKey] = {
                     stamp: selectedStamp,
                     color: selectedColor,
-                    amount: amount,
-                    paid: false // 支払い状態を `false` で初期化
+                    amount: amount
                 };
-                expenses[selectedDate.dateKey] = expenseData;
                 
                 updateCalendar();
                 updateTotalAmount();
                 closeExpenseModal();
-
-                if (calendarKey) {
+            }
+            if (calendarKey) {
                   db.collection('calendars')
                     .doc(calendarKey)
                     .collection('expenses')
                     .doc(selectedDate.dateKey)
-                    .set(expenseData);
+                    .set({
+                      stamp: selectedStamp,
+                      color: selectedColor,
+                      amount: amount
+                    });
                 }
-            }
         }
 
         // 支払い関連
         function updateTotalAmount() {
             var total = Object.values(expenses).reduce(function(sum, expense) {
-                // `paid`がtrueでない（未払い）項目のみ合計に加える
-                return expense.paid ? sum : sum + expense.amount;
+                return sum + expense.amount;
             }, 0);
             document.getElementById('totalAmount').textContent = '総額: ¥' + total.toLocaleString();
             document.getElementById('paymentBtn').disabled = total === 0;
@@ -1110,40 +964,23 @@
         }
 
         function processPayment() {
-            if (!calendarKey) {
-                closePaymentModal();
-                return;
-            }
-
-            const batch = db.batch();
-            
-            // 未払いの項目を `paid: true` に更新する
-            Object.keys(expenses).forEach(dateKey => {
-                if (!expenses[dateKey].paid) {
-                    const ref = db.collection('calendars')
-                                  .doc(calendarKey)
-                                  .collection('expenses')
-                                  .doc(dateKey);
-                    batch.update(ref, { paid: true });
-
-                    // ローカルのデータも更新
+            if (calendarKey) {
+                const batch = db.batch();
+                Object.keys(expenses).forEach(dateKey => {
                     expenses[dateKey].paid = true;
-                }
-            });
-
-            // Firestoreのバッチ処理を実行
-            batch.commit().then(() => {
-                console.log('Payment processed successfully.');
-                updateCalendar();
-                updateTotalAmount();
-                closePaymentModal();
-            }).catch(error => {
-                console.error("Error processing payment: ", error);
-                alert('支払処理中にエラーが発生しました。');
-                // エラーが起きた場合は、ローカルデータを再読み込みして整合性を保つ
-                loadExpenses();
-            });
-        };
+                    const ref = db.collection('calendars')
+                                .doc(calendarKey)
+                                .collection('expenses')
+                                .doc(dateKey);
+                    batch.set(ref, expenses[dateKey]);
+                });
+                batch.commit().then(() => {
+                    updateCalendar();
+                    updateTotalAmount();
+                    closePaymentModal();
+                });
+            }
+        }
         
                 if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -1153,6 +990,20 @@
                     console.log('ServiceWorker registration failed: ', err);
                 });
             });
+        }
+
+        function toggleDrawer() {
+            const drawer = document.getElementById('drawer');
+            drawer.style.left = drawer.style.left === '0px' ? '-300px' : '0px';
+        }
+
+        // カレンダーリスト表示（仮実装、動的処理は必要に応じて拡張）
+        function joinCalendar() {
+            const newKey = prompt('参加したいカレンダーキーを入力:');
+            if (newKey) {
+                localStorage.setItem('calendarKey', newKey);
+                location.reload();
+            }
         }
     </script>
 </body>
