@@ -733,34 +733,64 @@
         }
 
         // 初期化
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             initializeTheme();
             updateCalendar();
             createStampGrid();
             createColorGrid();
             createAmountGrid();
             updateTotalAmount();
+            updateCalendarList();
+
+            // スワイプ対応
+            let startX = 0;
+            document.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+            });
+            document.addEventListener('touchend', (e) => {
+                let endX = e.changedTouches[0].clientX;
+                let diff = endX - startX;
+                if (Math.abs(diff) > 50) {
+                    if (diff > 0) {
+                        navigateMonth(-1);
+                    } else {
+                        navigateMonth(1);
+                    }
+                }
+            });
+
+            // 🔽 ここに追加！
+            document.addEventListener('click', function (e) {
+                const drawer = document.getElementById('drawer');
+                const toggle = document.getElementById('drawerToggle');
+                if (!drawer.contains(e.target) && e.target !== toggle) {
+                    drawer.style.left = '-300px';
+                }
+            });
+
+            // Firebaseからデータ取得
             if (calendarKey) {
                 db.collection('calendars')
-                .doc(calendarKey)
-                .collection('expenses')
-                .get()
-                .then(snapshot => {
-                    if (snapshot.empty) {
-                        showFatalError('指定されたカレンダーは存在しません。');
-                    } else {
-                        snapshot.forEach(doc => {
-                            expenses[doc.id] = doc.data();
-                        });
-                        updateCalendar();
-                        updateTotalAmount();
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    showFatalError('カレンダーデータの取得中にエラーが発生しました。');
-                });
-            }});
+                    .doc(calendarKey)
+                    .collection('expenses')
+                    .get()
+                    .then(snapshot => {
+                        if (snapshot.empty) {
+                            showFatalError('指定されたカレンダーは存在しません。');
+                        } else {
+                            snapshot.forEach(doc => {
+                                expenses[doc.id] = doc.data();
+                            });
+                            updateCalendar();
+                            updateTotalAmount();
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showFatalError('カレンダーデータの取得中にエラーが発生しました。');
+                    });
+            }
+        });
 
         // テーマ関連
         function initializeTheme() {
@@ -1041,6 +1071,7 @@
                 const batch = db.batch();
                 Object.keys(expenses).forEach(dateKey => {
                     expenses[dateKey].paid = true;
+                    expenses[dateKey].amount = 0; // ← ここを追加
                     const ref = db.collection('calendars')
                                 .doc(calendarKey)
                                 .collection('expenses')
@@ -1054,6 +1085,7 @@
                 });
             }
         }
+
         
                 if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -1074,9 +1106,26 @@
         function joinCalendar() {
             const newKey = prompt('参加したいカレンダーキーを入力:');
             if (newKey) {
+                // 既存の履歴も取得
+                let keys = JSON.parse(localStorage.getItem('calendarKeys') || '[]');
+                if (!keys.includes(newKey)) keys.push(newKey);
+                localStorage.setItem('calendarKeys', JSON.stringify(keys));
                 localStorage.setItem('calendarKey', newKey);
                 location.reload();
             }
+        }
+
+        function updateCalendarList() {
+            const list = document.getElementById('calendarList');
+            const keys = JSON.parse(localStorage.getItem('calendarKeys') || '[]');
+            list.innerHTML = keys.map(key => `
+                <li><button onclick="switchCalendar('${key}')">${key}</button></li>
+            `).join('');
+        }
+
+        function switchCalendar(key) {
+            localStorage.setItem('calendarKey', key);
+            location.reload();
         }
 
         function showFatalError(message) {
