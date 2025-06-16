@@ -747,9 +747,16 @@
             </button>
 
             <hr style="margin: 16px 0;">
+            <button class="modal-btn success" onclick="getAdminAccess()" style="margin-bottom: 16px;">
+                管理者権限を取得する
+            </button>
+
+            <hr style="margin: 16px 0;">
             <button class="modal-btn danger" onclick="clearIndexedDB()" style="background-color: #f87171; color: white;">
                 ⚠ データ初期化（IndexedDBをクリア）
             </button>
+
+            <hr style="margin: 16px 0;">
 
             <div class="modal-buttons">
                 <button class="modal-btn secondary" onclick="closeSettings()">閉じる</button>
@@ -1074,10 +1081,25 @@
             const calRef = db.collection('calendars').doc(calendarKey);
 
             try {
+                const doc = await calRef.get();
+                if (!doc.exists) {
+                    alert('カレンダーが存在しません。');
+                    return;
+                }
+
+                const data = doc.data();
+                const adminPassword = data.adminPassword;
+
                 if (lock) {
-                    const doc = await calRef.get();
-                    if (!doc.exists || !doc.data().entryLocked) {
-                        // 初回ON時のみパスワード設定を促す
+                    // 管理者認証済みか確認（adminAuth:{calendarKey} に true が入っているか）
+                    const isAdmin = await getFromIndexedDB('adminAuth:' + calendarKey);
+                    if (!isAdmin) {
+                        alert('この操作には管理者パスワード認証が必要です。\n「管理者権限を取得する」ボタンから認証してください。');
+                        return;
+                    }
+
+                    // entryLockedがまだない（初回ON）の場合のみパスワードを設定
+                    if (!data.entryLocked || !data.entryPassword) {
                         let entryPassword = '';
                         while (true) {
                             entryPassword = prompt('入室に必要なパスワードを設定してください：');
@@ -1093,6 +1115,7 @@
                         }
                         await calRef.set({ entryLocked: true, entryPassword }, { merge: true });
                     } else {
+                        // すでに設定済みなら entryLocked を true にするだけ
                         await calRef.set({ entryLocked: true }, { merge: true });
                     }
                 } else {
@@ -1375,7 +1398,9 @@
                 if (!keys.includes(newKey)) keys.push(newKey);
                 await setToIndexedDB('calendarKeys', keys);
                 await setToIndexedDB('calendarKey', newKey);
-                location.reload();
+                calendarKey = newKey;
+                await updateCalendarList();
+                await loadCalendarData(); // ← 新しく作成する関数（カレンダー内容表示）
 
             } catch (error) {
                 console.error('カレンダー参加エラー:', error);
@@ -1581,6 +1606,48 @@
             } catch (err) {
                 alert('初期化に失敗しました。');
                 console.error(err);
+            }
+        }
+
+        async function loadCalendarData() {
+            const snapshot = await db.collection('calendars')
+                .doc(calendarKey)
+                .collection('expenses')
+                .get();
+
+            if (!snapshot.empty) {
+                expenses = {};
+                snapshot.forEach(doc => {
+                    expenses[doc.id] = doc.data();
+                });
+            }
+
+            updateCalendar();
+            updateTotalAmount();
+        }
+
+        async function getAdminAccess() {
+            try {
+                const doc = await db.collection('calendars').doc(calendarKey).get();
+                if (!doc.exists) {
+                    alert('カレンダーが存在しません。');
+                    return;
+                }
+
+                const adminPassword = doc.data().adminPassword;
+                const input = prompt('管理者パスワードを入力してください：');
+                if (input === null) return;
+
+                if (input !== adminPassword) {
+                    alert('パスワードが一致しません。');
+                    return;
+                }
+
+                await setToIndexedDB('adminAuth:' + calendarKey, true);
+                alert('管理者権限が付与されました。');
+            } catch (err) {
+                console.error('管理者認証エラー:', err);
+                alert('管理者認証に失敗しました。');
             }
         }
     </script>
