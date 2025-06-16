@@ -575,6 +575,16 @@
             background-color: #4b5563;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .drawer.open {
+            left: 0px !important;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 16px 8px;
@@ -609,17 +619,14 @@
 <body class="light">
     <div class="container">
         <!-- ヘッダー -->
-        <div class="header">
-            <button class="theme-toggle" onclick="toggleDrawer()" id="drawerToggle">
-                📂
-            </button>
-            <h1 class="title">
-                📅 支出管理カレンダー
-            </h1>
-            <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
-                🌙
-            </button>
-        </div>
+<div class="header">
+    <div class="header-left">
+        <button class="theme-toggle" onclick="toggleDrawer()" id="drawerToggle">📂</button>
+        <button class="theme-toggle" onclick="openSettings()" id="settingsToggle" style="margin-left: 8px;">⚙️</button>
+    </div>
+    <h1 class="title">📅 支出管理カレンダー</h1>
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
+</div>
 
         <div class="drawer" id="drawer">
             <h3>参加中のカレンダー</h3>
@@ -719,6 +726,36 @@
                 <button class="modal-btn success" onclick="processPayment()">
                     OK
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal hidden" id="settingsModal">
+        <div class="modal-content">
+            <h3 class="modal-title">設定</h3>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label">
+                    <input type="checkbox" id="entryLockCheckbox">
+                    入室をパスワードで制限する
+                </label>
+            </div>
+
+            <button class="modal-btn success" onclick="getAdminAccess()" style="margin-bottom: 12px;">
+                管理者権限を取得する
+            </button>
+
+            <button class="modal-btn danger" onclick="startDeleteCalendar()" style="background-color: #ef4444; color: white; margin-bottom: 12px;">
+                カレンダーを削除する
+            </button>
+
+            <button class="modal-btn danger" onclick="clearIndexedDB()" style="background-color: #f87171; color: white; margin-bottom: 24px;">
+                ⚠ データ初期化（IndexedDBをクリア）
+            </button>
+
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeSettings()">閉じる</button>
+                <button class="modal-btn primary" onclick="saveSettings()">保存</button>
             </div>
         </div>
     </div>
@@ -837,7 +874,6 @@
                 createStampGrid();
                 createColorGrid();
                 createAmountGrid();
-                updateCalendarList();
 
                 // スワイプ対応
                 let startX = 0;
@@ -888,6 +924,21 @@
                 alert('データベースの初期化に失敗しました。');
             }
         });
+        
+        document.addEventListener('click', (e) => {
+            const drawer = document.getElementById('drawer');
+            const toggle = document.getElementById('drawerToggle');
+
+            // ドロワーが開いていて、かつクリックが drawer or toggle ボタン以外なら閉じる
+            if (
+                drawer.classList.contains('open') &&
+                !drawer.contains(e.target) &&
+                !toggle.contains(e.target)
+            ) {
+                drawer.classList.remove('open');
+            }
+        });
+
 
         // テーマ関連
         async function initializeTheme() {
@@ -915,6 +966,27 @@
                 console.error('テーマ初期化エラー:', error);
                 setTheme('light');
             }
+        }
+
+        async function loadSettings() {
+            try {
+                const doc = await db.collection('calendars').doc(calendarKey).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    document.getElementById('entryLockCheckbox').checked = !!data.entryLocked;
+                }
+            } catch (error) {
+                console.error('設定読み込みエラー:', error);
+            }
+        }
+
+        function openSettings() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+            loadSettings(); // チェックボックス状態を反映
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
         }
 
         function setTheme(theme) {
@@ -996,6 +1068,60 @@
 
         function formatDateKey(year, month, day) {
             return `${year}-${month + 1}-${day}`;
+        }
+
+        async function saveSettings() {
+            const lock = document.getElementById('entryLockCheckbox').checked;
+            const calRef = db.collection('calendars').doc(calendarKey);
+
+            try {
+                const doc = await calRef.get();
+                if (!doc.exists) {
+                    alert('カレンダーが存在しません。');
+                    return;
+                }
+
+                const data = doc.data();
+                const adminPassword = data.adminPassword;
+
+                if (lock) {
+                    // 管理者認証済みか確認（adminAuth:{calendarKey} に true が入っているか）
+                    const isAdmin = await getFromIndexedDB('adminAuth:' + calendarKey);
+                    if (!isAdmin) {
+                        alert('この操作には管理者パスワード認証が必要です。\n「管理者権限を取得する」ボタンから認証してください。');
+                        return;
+                    }
+
+                    // entryLockedがまだない（初回ON）の場合のみパスワードを設定
+                    if (!data.entryLocked || !data.entryPassword) {
+                        let entryPassword = '';
+                        while (true) {
+                            entryPassword = prompt('入室に必要なパスワードを設定してください：');
+                            if (!entryPassword) {
+                                alert('パスワードの入力は必須です。');
+                                continue;
+                            }
+                            if (entryPassword.length < 6) {
+                                alert('パスワードは6文字以上にしてください。');
+                                continue;
+                            }
+                            break;
+                        }
+                        await calRef.set({ entryLocked: true, entryPassword }, { merge: true });
+                    } else {
+                        // すでに設定済みなら entryLocked を true にするだけ
+                        await calRef.set({ entryLocked: true }, { merge: true });
+                    }
+                } else {
+                    await calRef.set({ entryLocked: false }, { merge: true });
+                }
+
+                alert('設定を保存しました。');
+                closeSettings();
+            } catch (error) {
+                console.error('設定保存エラー:', error);
+                alert('設定の保存に失敗しました。');
+            }
         }
 
         // モーダル関連
@@ -1196,21 +1322,80 @@
 
         function toggleDrawer() {
             const drawer = document.getElementById('drawer');
-            drawer.style.left = drawer.style.left === '0px' ? '-300px' : '0px';
+            drawer.classList.toggle('open');
             document.getElementById('currentCalendarKey').textContent = calendarKey || '未設定';
         }
 
         async function joinCalendar() {
             try {
                 const newKey = prompt('参加したいカレンダーキーを入力:');
-                if (newKey) {
-                    // 既存の履歴も取得
-                    let keys = await getFromIndexedDB('calendarKeys') || [];
-                    if (!keys.includes(newKey)) keys.push(newKey);
-                    await setToIndexedDB('calendarKeys', keys);
-                    await setToIndexedDB('calendarKey', newKey);
-                    location.reload();
+                if (!newKey) return;
+
+                const calendarRef = db.collection('calendars').doc(newKey);
+                const doc = await calendarRef.get();
+
+                if (doc.exists) {
+                    const data = doc.data();
+
+                    if (data.entryLocked && data.entryPassword) {
+                        let passOk = false;
+                        for (let i = 0; i < 3; i++) { // 3回までトライ
+                            const input = prompt('このカレンダーは入室にパスワードが必要です。\nパスワードを入力してください:');
+                            if (input === null) return; // キャンセル
+                            if (input === data.entryPassword) {
+                                passOk = true;
+                                break;
+                            } else {
+                                alert('パスワードが間違っています。');
+                            }
+                        }
+                        if (!passOk) {
+                            alert('認証に失敗しました。参加できません。');
+                            return;
+                        }
+                    }
                 }
+
+                // 🔄 count の取得と +1
+                let count = 0;
+                if (doc.exists && doc.data().count) {
+                    count = doc.data().count;
+                }
+
+                await calendarRef.set({
+                    count: count + 1
+                }, { merge: true });
+
+                // 👑 初参加 or ほぼ初参加
+                if (count === 0 || count === 1) {
+                    let adminPassword = '';
+                    while (true) {
+                        adminPassword = prompt('支出管理カレンダーへようこそ！\nあなたはこのカレンダーの管理者です。\nパスワードを設定してください。');
+                        if (!adminPassword) {
+                            alert('パスワードの入力は必須です。');
+                            continue;
+                        }
+
+                        const tooSimple = ['1234567890', 'abcdefghijklmnopqrstu', 'password', 'qwerty', 'admin'];
+                        if (adminPassword.length < 6 || tooSimple.includes(adminPassword.toLowerCase())) {
+                            alert('そのパスワードは簡単すぎます。もう少し複雑なものにしてください。');
+                            continue;
+                        }
+                        break;
+                    }
+
+                    await calendarRef.set({ adminPassword }, { merge: true });
+                }
+
+                // 🔄 参加処理本体
+                let keys = await getFromIndexedDB('calendarKeys') || [];
+                if (!keys.includes(newKey)) keys.push(newKey);
+                await setToIndexedDB('calendarKeys', keys);
+                await setToIndexedDB('calendarKey', newKey);
+                calendarKey = newKey;
+                await updateCalendarList();
+                await loadCalendarData(); // ← 新しく作成する関数（カレンダー内容表示）
+
             } catch (error) {
                 console.error('カレンダー参加エラー:', error);
                 alert('カレンダーへの参加に失敗しました。');
@@ -1220,34 +1405,102 @@
         async function updateCalendarList() {
             try {
                 const list = document.getElementById('calendarList');
-                list.innerHTML = ''; // ← まず空にする
+                list.innerHTML = '';
 
-                const keys = await getFromIndexedDB('calendarKeys') || [];
+                let keys = await getFromIndexedDB('calendarKeys') || [];
+                const validKeys = [];
 
-                // 現在のカレンダーキーを表示
+                // 現在のキー表示
                 const currentItem = document.createElement('li');
                 currentItem.innerHTML = 'カレンダーキー: <code id="currentCalendarKey">' + (calendarKey || '') + '</code>';
                 list.appendChild(currentItem);
 
-                if (keys.length === 0) {
+                let totalSum = 0;
+
+                for (const key of keys) {
+                    const doc = await db.collection('calendars').doc(key).get();
+                    if (!doc.exists) {
+                        // 古いキーを除外
+                        continue;
+                    }
+
+                    validKeys.push(key); // validと判断されたものだけ保持
+
+                    const li = document.createElement('li');
+
+                    const row = document.createElement('div');
+                    row.style.display = 'flex';
+                    row.style.alignItems = 'center';
+                    row.style.gap = '8px';
+
+                    const btn = document.createElement('button');
+                    btn.textContent = key;
+                    btn.className = 'calendar-switch-btn';
+                    btn.onclick = () => switchCalendar(key);
+
+                    const leaveBtn = document.createElement('span');
+                    leaveBtn.textContent = '🚪';
+                    leaveBtn.style.cursor = 'pointer';
+                    leaveBtn.style.fontSize = '16px';
+                    leaveBtn.onclick = () => confirmLeaveCalendar(key);
+                    
+                    row.appendChild(btn);
+                    row.appendChild(leaveBtn);
+                    li.appendChild(row);
+                    list.appendChild(li);
+
+                    // 金額加算
+                    const snapshot = await db.collection('calendars').doc(key).collection('expenses').get();
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.amount && !data.paid) {
+                            totalSum += data.amount;
+                        }
+                    });
+                }
+
+                // 🔁 保存するカレンダーキーを更新
+                await setToIndexedDB('calendarKeys', validKeys);
+
+                if (validKeys.length === 0) {
                     const emptyItem = document.createElement('li');
                     emptyItem.textContent = '参加中のカレンダーがありません';
                     list.appendChild(emptyItem);
-                } else {
-                    keys.forEach(key => {
-                        const li = document.createElement('li');
-                        const btn = document.createElement('button');
-                        btn.textContent = key;
-                        btn.className = 'calendar-switch-btn';
-                        btn.onclick = () => switchCalendar(key);
-                        li.appendChild(btn);
-                        list.appendChild(li);
-                    });
                 }
+
+                // 総額表示
+                const totalLi = document.createElement('li');
+                totalLi.style.marginTop = '12px';
+                totalLi.style.fontWeight = 'bold';
+                totalLi.textContent = `🧮 総合計: ¥${totalSum.toLocaleString()}`;
+                list.appendChild(totalLi);
             } catch (error) {
                 console.error('カレンダーリスト更新エラー:', error);
             }
         }
+
+        async function confirmLeaveCalendar(key) {
+            const confirmMsg = `${key} から退出しますか？\n退出しても参加ボタンから再度参加が可能です。`;
+            if (confirm(confirmMsg)) {
+                try {
+                    let keys = await getFromIndexedDB('calendarKeys') || [];
+                    keys = keys.filter(k => k !== key);
+                    await setToIndexedDB('calendarKeys', keys);
+
+                    // 現在のカレンダーだったら強制リロード
+                    if (key === calendarKey) {
+                        await removeFromIndexedDB('calendarKey');
+                        location.reload();
+                    } else {
+                        await updateCalendarList();
+                    }
+                } catch (error) {
+                    console.error('退出処理エラー:', error);
+                    alert('カレンダーの退出に失敗しました。');
+                }
+            }
+        }
+
 
         async function switchCalendar(key) {
             try {
@@ -1267,6 +1520,129 @@
                 console.error('データクリアエラー:', error);
             }
             location.reload();
+        }
+
+        async function startDeleteCalendar() {
+            try {
+                const doc = await db.collection('calendars').doc(calendarKey).get();
+                if (!doc.exists) {
+                    alert('カレンダーが存在しません。');
+                    return;
+                }
+
+                const adminPassword = doc.data().adminPassword;
+                let input = prompt('カレンダーを削除するには管理者パスワードを入力してください：');
+                if (input === null) return;
+
+                if (input !== adminPassword) {
+                    alert('パスワードが一致しません。');
+                    return;
+                }
+
+                // 魂の7連アラート
+                const messages = [
+                    'この操作を続行するとスタンプ、総額などすべて闇に葬られます。\nこの操作は取り消すことはできません。',
+                    'この操作を本当に続行するんですか？\nカレンダーも、総額も、スタンプも、思い出も、Firebaseもすべてが抹消されます。',
+                    'この操作を本当の本当に続行するんですか？\nカレンダーも、色も、思い出も、Firebaseも、開発者の血も、開発者の涙も、開発者の汗もなかったことになります。',
+                    'この操作を本当の本当の本当に続行するならあなたがロボットではないことを確認させてください。',
+                    'キャプチャ確認（※代替）\n「私はロボットではありません」と入力してください。',
+                    'この操作を本当の本当の本当の本当に続行しますか？OKを押すとほんとに消えます。',
+                    '消えるよ？本当にいいんだね？'
+                ];
+
+                for (let i = 0; i < messages.length; i++) {
+                    if (i === 4) {
+                        const captcha = prompt(messages[i]);
+                        if (captcha?.trim().toLowerCase() !== '私はロボットではありません') {
+                            alert('確認に失敗しました。');
+                            return;
+                        }
+                    } else {
+                        if (!confirm(messages[i])) return;
+                    }
+                }
+
+                // Firestore削除
+                const expensesSnap = await db.collection('calendars').doc(calendarKey).collection('expenses').get();
+                const batch = db.batch();
+                expensesSnap.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+
+                await db.collection('calendars').doc(calendarKey).delete();
+
+                // IndexedDBから削除
+                const keys = await getFromIndexedDB('calendarKeys') || [];
+                const newKeys = keys.filter(k => k !== calendarKey);
+                await setToIndexedDB('calendarKeys', newKeys);
+                await removeFromIndexedDB('calendarKey');
+
+                alert('カレンダーは完全に削除されました。');
+                location.reload();
+
+            } catch (error) {
+                console.error('カレンダー削除エラー:', error);
+                alert('削除に失敗しました。');
+            }
+        }
+
+        async function clearIndexedDB() {
+            const confirmed = confirm('本当に全ローカルデータ（カレンダーキーなど）を削除しますか？');
+            if (!confirmed) return;
+
+            try {
+                await removeFromIndexedDB('calendarKey');
+                await removeFromIndexedDB('calendarKeys');
+                await removeFromIndexedDB('theme');
+                alert('データを初期化しました。再読み込みします。');
+                location.reload();
+            } catch (err) {
+                alert('初期化に失敗しました。');
+                console.error(err);
+            }
+        }
+
+        async function loadCalendarData() {
+            const snapshot = await db.collection('calendars')
+                .doc(calendarKey)
+                .collection('expenses')
+                .get();
+
+            if (!snapshot.empty) {
+                expenses = {};
+                snapshot.forEach(doc => {
+                    expenses[doc.id] = doc.data();
+                });
+            }
+
+            updateCalendar();
+            updateTotalAmount();
+        }
+
+        async function getAdminAccess() {
+            try {
+                const doc = await db.collection('calendars').doc(calendarKey).get();
+                if (!doc.exists) {
+                    alert('カレンダーが存在しません。');
+                    return;
+                }
+
+                const adminPassword = doc.data().adminPassword;
+                const input = prompt('管理者パスワードを入力してください：');
+                if (input === null) return;
+
+                if (input !== adminPassword) {
+                    alert('パスワードが一致しません。');
+                    return;
+                }
+
+                await setToIndexedDB('adminAuth:' + calendarKey, true);
+                alert('管理者権限が付与されました。');
+            } catch (err) {
+                console.error('管理者認証エラー:', err);
+                alert('管理者認証に失敗しました。');
+            }
         }
     </script>
 </body>
