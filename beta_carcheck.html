@@ -734,29 +734,24 @@
         <div class="modal-content">
             <h3 class="modal-title">設定</h3>
 
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 16px;">
                 <label class="form-label">
                     <input type="checkbox" id="entryLockCheckbox">
                     入室をパスワードで制限する
                 </label>
             </div>
 
-            <hr style="margin: 16px 0;">
-            <button class="modal-btn danger" onclick="startDeleteCalendar()" style="background-color: #ef4444; color: white;">
-                カレンダーを削除する
-            </button>
-
-            <hr style="margin: 16px 0;">
-            <button class="modal-btn success" onclick="getAdminAccess()" style="margin-bottom: 16px;">
+            <button class="modal-btn success" onclick="getAdminAccess()" style="margin-bottom: 12px;">
                 管理者権限を取得する
             </button>
 
-            <hr style="margin: 16px 0;">
-            <button class="modal-btn danger" onclick="clearIndexedDB()" style="background-color: #f87171; color: white;">
-                ⚠ データ初期化（IndexedDBをクリア）
+            <button class="modal-btn danger" onclick="startDeleteCalendar()" style="background-color: #ef4444; color: white; margin-bottom: 12px;">
+                カレンダーを削除する
             </button>
 
-            <hr style="margin: 16px 0;">
+            <button class="modal-btn danger" onclick="clearIndexedDB()" style="background-color: #f87171; color: white; margin-bottom: 24px;">
+                ⚠ データ初期化（IndexedDBをクリア）
+            </button>
 
             <div class="modal-buttons">
                 <button class="modal-btn secondary" onclick="closeSettings()">閉じる</button>
@@ -764,7 +759,6 @@
             </div>
         </div>
     </div>
-
 
 <script>
         // グローバル変数
