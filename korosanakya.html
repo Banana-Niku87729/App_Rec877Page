@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="tako.ico">
     <title>久世しずかを殺さなきゃジェネレーター</title>
     <style>
         @font-face {
@@ -271,7 +270,10 @@
             <div class="controls">
                 <div class="counter">
                     <div class="counter-number" id="generationCount">0</div>
-                    <div class="counter-label">生成された数</div>
+                    <div class="counter-label">全体の生成された数</div>
+                    <div style="font-size: 0.8rem; color: #888; margin-top: 5px;">
+                        <span id="connectionStatus">🔄 接続中...</span>
+                    </div>
                 </div>
 
                 <div class="control-group">
@@ -354,6 +356,32 @@
         </div>
     </div>
 
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getDatabase, ref, onValue, runTransaction } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js';
+
+        // Firebase設定（実際のプロジェクトの設定に置き換えてください）
+      const firebaseConfig = {
+        apiKey: "AIzaSyBkGyT1IRF8CcsDXF6avTF1gi0kzcEMTc8",
+        authDomain: "korosanakya.firebaseapp.com",
+        databaseURL: "https://korosanakya-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "korosanakya",
+        storageBucket: "korosanakya.firebasestorage.app",
+        messagingSenderId: "200274591396",
+        appId: "1:200274591396:web:0a1e19bf8fa2bd37ed7031",
+        measurementId: "G-2JY872JMJQ"
+      };
+
+        // Firebase初期化
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const countRef = ref(database, 'korosanakya/totalCount');
+
+        // グローバル変数として公開
+        window.firebase = { database, countRef, onValue, runTransaction };
+    </script>
+
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -363,25 +391,57 @@
         // デフォルト背景画像のURL（変更可能）
         const defaultImageUrl = 'https://i.imgur.com/ezw59Mf.png';
         
-        // 生成数をローカルストレージから読み込み
+        // Firebaseから生成数をリアルタイムで読み込み
         function loadGenerationCount() {
-            const saved = localStorage.getItem('korosanakya-count');
-            if (saved) {
-                generationCount = parseInt(saved, 10);
-                document.getElementById('generationCount').textContent = generationCount;
+            if (window.firebase) {
+                const { countRef, onValue } = window.firebase;
+                onValue(countRef, (snapshot) => {
+                    const count = snapshot.val() || 0;
+                    generationCount = count;
+                    document.getElementById('generationCount').textContent = generationCount;
+                    document.getElementById('connectionStatus').innerHTML = '🟢 リアルタイム更新中';
+                }, (error) => {
+                    console.error('Firebase接続エラー:', error);
+                    document.getElementById('connectionStatus').innerHTML = '🔴 オフライン';
+                    // エラー時はローカルストレージから読み込み
+                    const saved = localStorage.getItem('korosanakya-count');
+                    if (saved) {
+                        generationCount = parseInt(saved, 10);
+                        document.getElementById('generationCount').textContent = generationCount;
+                    }
+                });
+            } else {
+                // Firebase未接続時はローカルストレージから読み込み
+                document.getElementById('connectionStatus').innerHTML = '🔴 オフライン';
+                const saved = localStorage.getItem('korosanakya-count');
+                if (saved) {
+                    generationCount = parseInt(saved, 10);
+                    document.getElementById('generationCount').textContent = generationCount;
+                }
             }
         }
 
-        // 生成数を保存
-        function saveGenerationCount() {
-            localStorage.setItem('korosanakya-count', generationCount.toString());
-        }
-
-        // 生成数を増加
+        // 生成数を増加（Firebaseまたはローカルストレージ）
         function incrementGenerationCount() {
-            generationCount++;
-            document.getElementById('generationCount').textContent = generationCount;
-            saveGenerationCount();
+            if (window.firebase) {
+                const { countRef, runTransaction } = window.firebase;
+                runTransaction(countRef, (currentValue) => {
+                    return (currentValue || 0) + 1;
+                }).then((result) => {
+                    console.log('カウント更新成功:', result.snapshot.val());
+                }).catch((error) => {
+                    console.error('カウント更新エラー:', error);
+                    // エラー時はローカルで増加
+                    generationCount++;
+                    document.getElementById('generationCount').textContent = generationCount;
+                    localStorage.setItem('korosanakya-count', generationCount.toString());
+                });
+            } else {
+                // Firebase未接続時はローカルストレージを使用
+                generationCount++;
+                document.getElementById('generationCount').textContent = generationCount;
+                localStorage.setItem('korosanakya-count', generationCount.toString());
+            }
         }
         
         // 初期背景画像を読み込み
@@ -583,10 +643,12 @@ Create by @BNiku87729`;
             drawCanvas();
         });
 
-        // 初期化
-        loadGenerationCount();
-        initCanvas();
-        updateRangeValues();
+        // 初期化（Firebase読み込み後に実行）
+        setTimeout(() => {
+            loadGenerationCount();
+            initCanvas();
+            updateRangeValues();
+        }, 1000); // Firebase初期化を待つ
     </script>
 </body>
 </html>
