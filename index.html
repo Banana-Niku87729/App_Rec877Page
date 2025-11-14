@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="icon.png" type="image/x-icon">
+    <link rel="stylesheet" href="style.css">
+    <title>Rec877Apps - ゴミの巣窟</title>
+</head>
+<body>
+    <button class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌙</button>
+    
+    <div class="introduction">
+        <h1>Rec877<span style="color: #00a6ff;">Apps</span></h1>
+        <h2>使い道も意味もないWebアプリを作って放置したりしてます!!</h2>
+        <p>誰かが使えばいいな、そうとしか思ってません。</p>
+        <a href="#apps" class="btn btn--orange">アプリをすべて見る</a>
+        <a href="https://github.com/Banana-Niku87729/App_Rec877Page" target="_blank" rel="noopener" class="btn btn--github">Githubのレポジトリを見る</a>
+    </div>
+    <div id="kugiri">
+        <hr>
+    </div>
+    <div class="apps" id="apps">
+        <h1><span style="color: #00a6ff;">Apps</span></h1>
+        <div class="card card-skin">
+            <div class="card__imgframe"></div>
+            <div class="card__textbox">
+                <div class="card__titletext">
+                    支出管理カレンダー
+                </div>
+                <div class="card__overviewtext">
+                    暇なので作ったWebアプリ。カレンダーにスタンプを押して金額も同時に指定することにより、支出を管理できます。<br>(ご利用にはカレンダーキーが必須です。)
+                </div>
+                <a href="https://app.rec877.com/carcheck" class="btn btn--card" target="_blank">サイトへ移動</a>
+            </div>
+        </div>
+        <div class="card card-skin">
+            <div class="card__imgframe2"></div>
+            <div class="card__textbox">
+                <div class="card__titletext">
+                    久世しずかを殺さなきゃジェネレーター
+                </div>
+                <div class="card__overviewtext">
+                    ハッピーだっぴね!
+                </div>
+                <a href="https://app.rec877.com/korosanakya" class="btn btn--card" target="_blank">サイトへ移動</a>
+            </div>
+        </div>
+        <div class="card card-skin">
+            <div class="card__imgframe3"></div>
+            <div class="card__textbox">
+                <div class="card__titletext">
+                    カレンダー登録
+                </div>
+                <div class="card__overviewtext">
+                    支出管理カレンダーにアクセスするためのキーを発行できるサイト。5分に1回までキーを発行できます。
+                </div>
+                <a href="https://app.rec877.com/beta_carregister" class="btn btn--card" target="_blank">サイトへ移動</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        
+        // 保存されたテーマを読み込み
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+        themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        
+        // テーマ切り替え
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        });
+    </script>
+</body>
+</html>
