@@ -1026,8 +1026,8 @@
             modeBot.disabled = false;
             modeMulti.disabled = false;
         }
+        function togglePause() {
             if (playerState.isGameOver) return;
-            if (activeMode === 'multi') return; // オンライン対戦中はポーズ不可
             const states = activeMode === 'bot' ? [playerState, aiState] : [playerState];
             const pausing = !playerState.isPaused;
             states.forEach(state => {
@@ -1041,6 +1041,7 @@
                 }
             });
             startButton.textContent = pausing ? "RESUME" : "START";
+        }
 
         // ---------- ホールド ----------
         function holdFunction(state) {
