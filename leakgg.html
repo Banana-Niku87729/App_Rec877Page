@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>leak.gg</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/AKIZMomiji/get/f6542e1cdfb25af73b26c676b2164dea87835740/%E3%82%B3%E3%82%B9%E3%83%81%E3%83%A5%E3%83%BC%E3%83%A01%20(7).svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: "Silkscreen", sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px 0 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .controls-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 10px 16px;
+        }
+        .controls-bar label {
+            font-size: 0.85em;
+            color: #333;
+        }
+        select#levelSelect {
+            font-family: "Silkscreen", sans-serif;
+            font-size: 0.9em;
+            padding: 4px 6px;
+        }
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+        }
+        .mode-toggle label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+        .level-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .level-group.hidden {
+            display: none;
+        }
+        .player-block.hidden {
+            display: none;
+        }
+        .arena {
+            display: flex;
+            gap: 40px;
+        }
+        .player-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .player-label {
+            font-size: 1em;
+            color: #333;
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+        }
+        canvas.gameCanvas {
+            border: 2px solid #333;
+            background-color: #eee;
+        }
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 130px;
+        }
+        .info-box {
+            border: 1px solid #ccc;
+            padding: 8px;
+            background: #fff;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 0.8em;
+        }
+        .scoreEl, .levelEl, .linesEl {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #d9534f;
+        }
+        .nextCanvas, .holdCanvas {
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+        }
+        button#startButton {
+            padding: 10px 15px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-family: "Silkscreen", sans-serif;
+        }
+        button#startButton:hover {
+            background-color: #45a049;
+        }
+        button#startButton:disabled {
+            background-color: #999;
+            cursor: default;
+        }
+
+        /* ---------- モーダル共通 ---------- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.hidden { display: none; }
+        .modal-box {
+            background: #fff;
+            border: 2px solid #333;
+            padding: 24px 28px;
+            width: 320px;
+            max-width: 90vw;
+            box-sizing: border-box;
+        }
+        .modal-box h2 {
+            margin-top: 0;
+            font-size: 1em;
+            color: #333;
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .modal-box input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+            font-family: "Silkscreen", sans-serif;
+            font-size: 0.95em;
+            padding: 8px;
+            border: 1px solid #ccc;
+            margin-bottom: 6px;
+        }
+        .modal-box .field-hint {
+            font-size: 0.7em;
+            color: #999;
+            margin-bottom: 14px;
+        }
+        .modal-box .field-error {
+            font-size: 0.75em;
+            color: #d9534f;
+            margin-bottom: 10px;
+            min-height: 1em;
+        }
+        .modal-btn {
+            width: 100%;
+            padding: 10px;
+            font-size: 0.9em;
+            font-family: "Silkscreen", sans-serif;
+            cursor: pointer;
+            border: none;
+            color: #fff;
+            background-color: #4CAF50;
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
+        .modal-btn:hover { background-color: #45a049; }
+        .modal-btn.secondary {
+            background-color: #337ab7;
+        }
+        .modal-btn.secondary:hover { background-color: #2b699c; }
+        .modal-btn.ghost {
+            background-color: #eee;
+            color: #333;
+            border: 1px solid #ccc;
+        }
+        .modal-btn.ghost:hover { background-color: #e2e2e2; }
+        .modal-btn:disabled {
+            background-color: #999;
+            cursor: default;
+        }
+        .modal-choice-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .modal-sub-desc {
+            font-size: 0.72em;
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .modal-status {
+            font-size: 0.8em;
+            color: #333;
+            text-align: center;
+            margin-bottom: 14px;
+            min-height: 1.2em;
+        }
+        .room-code-display {
+            font-size: 1.6em;
+            letter-spacing: 4px;
+            text-align: center;
+            color: #d9534f;
+            font-weight: bold;
+            margin-bottom: 14px;
+            user-select: all;
+        }
+        .modal-back-link {
+            display: block;
+            text-align: center;
+            font-size: 0.75em;
+            color: #666;
+            margin-top: 6px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .connection-badge {
+            display: inline-block;
+            font-size: 0.65em;
+            padding: 2px 8px;
+            margin-left: 8px;
+            border-radius: 10px;
+            color: #fff;
+            vertical-align: middle;
+        }
+        .connection-badge.connecting { background-color: #f0ad4e; }
+        .connection-badge.connected { background-color: #4CAF50; }
+        .connection-badge.disconnected { background-color: #d9534f; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <h1>LEAK.GG</h1>
+
+    <div class="controls-bar">
+        <div class="mode-toggle">
+            <label><input type="radio" name="mode" value="solo" id="modeSolo" checked> Solo</label>
+            <label><input type="radio" name="mode" value="bot" id="modeBot"> BOT</label>
+            <label><input type="radio" name="mode" value="multi" id="modeMulti"> MULTI</label>
+        </div>
+        <div class="level-group hidden" id="levelGroup">
+            <label for="levelSelect">BOT LEVEL</label>
+            <select id="levelSelect">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5" selected>5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+            </select>
+        </div>
+        <button id="startButton">START</button>
+    </div>
+
+    <!-- ユーザー名設定モーダル -->
+    <div class="modal-overlay hidden" id="usernameModalOverlay">
+        <div class="modal-box">
+            <h2>ユーザー名を設定</h2>
+            <input type="text" id="usernameInput" maxlength="12" placeholder="例: rec877" autocomplete="off">
+            <div class="field-hint">1〜12文字（オンライン対戦で表示されます）</div>
+            <div class="field-error" id="usernameError"></div>
+            <button class="modal-btn" id="usernameSaveBtn">決定</button>
+            <span class="modal-back-link hidden" id="usernameCancelLink">キャンセル</span>
+        </div>
+    </div>
+
+    <!-- マルチプレイ フロー モーダル -->
+    <div class="modal-overlay hidden" id="multiModalOverlay">
+        <div class="modal-box">
+
+            <!-- STEP: 参加方法選択 -->
+            <div id="stepChoice">
+                <h2>MULTIPLAY</h2>
+                <div class="modal-choice-row">
+                    <button class="modal-btn secondary" id="btnGoRandomMatch">リアルタイムマッチ</button>
+                    <button class="modal-btn secondary" id="btnGoCodeMenu">コードで参加</button>
+                </div>
+                <div class="modal-sub-desc">リアルタイムマッチ：対戦相手を自動で探します<br>コードで参加：合言葉（コード）で友達と対戦</div>
+                <span class="modal-back-link" id="choiceCancelLink">閉じる</span>
+            </div>
+
+            <!-- STEP: コードメニュー（作成 or 参加） -->
+            <div id="stepCodeMenu" class="hidden">
+                <h2>コードで参加</h2>
+                <div class="modal-choice-row">
+                    <button class="modal-btn secondary" id="btnCreateRoom">ルームを作成</button>
+                    <button class="modal-btn secondary" id="btnJoinRoom">コードを入力して参加</button>
+                </div>
+                <span class="modal-back-link" id="codeMenuBackLink">戻る</span>
+            </div>
+
+            <!-- STEP: コード入力 -->
+            <div id="stepJoinInput" class="hidden">
+                <h2>コードを入力</h2>
+                <input type="text" id="joinCodeInput" maxlength="6" placeholder="例: A1B2C3" autocomplete="off" style="text-transform:uppercase; text-align:center; letter-spacing:4px;">
+                <div class="field-error" id="joinCodeError"></div>
+                <button class="modal-btn" id="btnSubmitJoinCode">参加する</button>
+                <span class="modal-back-link" id="joinInputBackLink">戻る</span>
+            </div>
+
+            <!-- STEP: ルーム待機（ホスト） -->
+            <div id="stepHostWait" class="hidden">
+                <h2>対戦相手を待っています</h2>
+                <div class="room-code-display" id="hostRoomCode">------</div>
+                <div class="modal-sub-desc">このコードを相手に伝えてください</div>
+                <div class="modal-status" id="hostWaitStatus">待機中...</div>
+                <button class="modal-btn ghost" id="btnCancelHostWait">キャンセル</button>
+            </div>
+
+            <!-- STEP: マッチメイキング中 -->
+            <div id="stepMatchmaking" class="hidden">
+                <h2>対戦相手を探しています</h2>
+                <div class="modal-status" id="matchmakingStatus">検索中...</div>
+                <button class="modal-btn ghost" id="btnCancelMatchmaking">キャンセル</button>
+            </div>
+
+            <!-- STEP: 接続エラー -->
+            <div id="stepConnError" class="hidden">
+                <h2>接続エラー</h2>
+                <div class="modal-status" id="connErrorMessage">サーバーに接続できませんでした</div>
+                <button class="modal-btn" id="btnConnErrorBack">戻る</button>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="arena">
+        <div class="player-block">
+            <div class="player-label">YOU</div>
+            <div class="game-container">
+                <canvas class="gameCanvas" id="gameCanvasP"></canvas>
+                <div class="info-panel">
+                    <div class="info-box"><h3>SCORE</h3><div class="scoreEl" id="scoreP">0</div></div>
+                    <div class="info-box"><h3>LEVEL</h3><div class="levelEl" id="levelP">1</div></div>
+                    <div class="info-box"><h3>LINES</h3><div class="linesEl" id="linesP">0</div></div>
+                    <div class="info-box"><h3>HOLD (C)</h3><canvas class="holdCanvas" id="holdCanvasP" width="100" height="100"></canvas></div>
+                    <div class="info-box"><h3>NEXT</h3><canvas class="nextCanvas" id="nextCanvasP" width="100" height="100"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="player-block" id="botBlock">
+            <div class="player-label" id="botLabel">BOT (LV.5)<span class="connection-badge hidden" id="connBadge"></span></div>
+            <div class="game-container">
+                <canvas class="gameCanvas" id="gameCanvasA"></canvas>
+                <div class="info-panel">
+                    <div class="info-box"><h3>SCORE</h3><div class="scoreEl" id="scoreA">0</div></div>
+                    <div class="info-box"><h3>LEVEL</h3><div class="levelEl" id="levelA">1</div></div>
+                    <div class="info-box"><h3>LINES</h3><div class="linesEl" id="linesA">0</div></div>
+                    <div class="info-box"><h3>HOLD</h3><canvas class="holdCanvas" id="holdCanvasA" width="100" height="100"></canvas></div>
+                    <div class="info-box"><h3>NEXT</h3><canvas class="nextCanvas" id="nextCanvasA" width="100" height="100"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ROWS = 20;
+        const COLS = 10;
+        const BLOCK_SIZE = 30;
+        const NEXT_BLOCK_SIZE = 18;
+
+        const SHAPES = [
+            [],
+            [[0, 1, 0], [1, 1, 1], [0, 0, 0]], // T (3x3)
+            [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], // I (4x4)
+            [[1, 1], [1, 1]], // O (2x2)
+            [[0, 0, 1], [1, 1, 1], [0, 0, 0]], // L (3x3)
+            [[1, 0, 0], [1, 1, 1], [0, 0, 0]], // J (3x3)
+            [[0, 1, 1], [1, 1, 0], [0, 0, 0]], // S (3x3)
+            [[1, 1, 0], [0, 1, 1], [0, 0, 0]]  // Z (3x3)
+        ];
+
+        const COLORS = [
+            null, 'purple', 'cyan', 'yellow', 'orange', 'blue', 'lime', 'red', '#555'
+        ];
+        const GARBAGE_COLOR_INDEX = 8;
+        const GARBAGE_TABLE = { 2: 1, 3: 2, 4: 4 };
+
+        const startButton = document.getElementById('startButton');
+        const levelSelect = document.getElementById('levelSelect');
+        const levelGroup = document.getElementById('levelGroup');
+        const botLabel = document.getElementById('botLabel');
+        const botBlock = document.getElementById('botBlock');
+        const modeSolo = document.getElementById('modeSolo');
+        const modeBot = document.getElementById('modeBot');
+        const modeMulti = document.getElementById('modeMulti');
+        const connBadge = document.getElementById('connBadge');
+
+        // ★ 全体共有のピースバッグシステム（ネクストを同一にするため）
+        let globalPieceBag = [];
+        let globalPointer = 0;
+
+        // オンライン対戦では両者で同じミノ順にするためシード付き乱数を使う
+        let pieceRng = Math.random;
+        function mulberry32(seed) {
+            let a = seed >>> 0;
+            return function () {
+                a |= 0; a = (a + 0x6D2B79F5) | 0;
+                let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+        function setPieceSeed(seed) {
+            pieceRng = (seed === null || seed === undefined) ? Math.random : mulberry32(seed);
+        }
+
+        function fillGlobalPieceBag() {
+            const pieces = [1, 2, 3, 4, 5, 6, 7];
+            for (let i = pieces.length - 1; i > 0; i--) {
+                const j = Math.floor(pieceRng() * (i + 1));
+                [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+            }
+            globalPieceBag = globalPieceBag.concat(pieces);
+        }
+
+        function getGlobalPieceIndex(index) {
+            while (index >= globalPieceBag.length) {
+                fillGlobalPieceBag();
+            }
+            return globalPieceBag[index];
+        }
+
+        function currentMode() {
+            if (modeMulti.checked) return 'multi';
+            return modeBot.checked ? 'bot' : 'solo';
+        }
+
+        function applyModeVisibility() {
+            const mode = currentMode();
+            levelGroup.classList.toggle('hidden', mode !== 'bot');
+            botBlock.classList.toggle('hidden', mode === 'solo');
+            if (mode !== 'multi') connBadge.classList.add('hidden');
+        }
+        modeSolo.addEventListener('change', applyModeVisibility);
+        modeBot.addEventListener('change', applyModeVisibility);
+        modeMulti.addEventListener('change', () => {
+            applyModeVisibility();
+            if (modeMulti.checked) MP.openFlow();
+        });
+        applyModeVisibility();
+
+        // ---------- 状態生成 ----------
+        function makeState(isAI, suffix) {
+            const canvas = document.getElementById('gameCanvas' + suffix);
+            const ctx = canvas.getContext('2d');
+            canvas.width = COLS * BLOCK_SIZE;
+            canvas.height = ROWS * BLOCK_SIZE;
+            const nextCanvas = document.getElementById('nextCanvas' + suffix);
+            const holdCanvas = document.getElementById('holdCanvas' + suffix);
+            return {
+                isAI,
+                canvas, ctx,
+                nextCanvas, nextCtx: nextCanvas.getContext('2d'),
+                holdCanvas, holdCtx: holdCanvas.getContext('2d'),
+                scoreEl: document.getElementById('score' + suffix),
+                levelEl: document.getElementById('level' + suffix),
+                linesEl: document.getElementById('lines' + suffix),
+                board: [],
+                currentPiece: null,
+                nextPiece: null,
+                holdPiece: null,
+                hasHeldThisTurn: false,
+                score: 0,
+                level: 1,
+                lines: 0,
+                dropInterval: null,
+                aiInterval: null,
+                aiPlan: null,
+                isGameOver: true,
+                isPaused: false,
+                gameLoopSpeed: 1000,
+                pieceIndexPointer: 0, // それぞれ何番目のミノを引いているかのポインタ
+                isLockDelaying: false,
+                opponent: null
+            };
+        }
+
+        const playerState = makeState(false, 'P');
+        const aiState = makeState(true, 'A');
+        playerState.opponent = aiState;
+        aiState.opponent = playerState;
+        let activeMode = 'solo';
+
+        // ---------- 初期化 ----------
+        function init(state, startLevel) {
+            state.board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+            state.score = 0;
+            state.level = startLevel;
+            state.lines = 0;
+            state.gameLoopSpeed = 1000;
+            state.scoreEl.textContent = state.score;
+            state.levelEl.textContent = state.level;
+            state.linesEl.textContent = state.lines;
+            state.pieceIndexPointer = 0; // ポインタ初期化
+            state.holdPiece = null;
+            state.hasHeldThisTurn = false;
+            state.isLockDelaying = false;
+            state.aiPlan = null;
+            drawHoldPiece(state);
+            state.isGameOver = false;
+            state.isPaused = false;
+            state.nextPiece = createNewPiece(state);
+            spawnNewPiece(state);
+            startGameLoop(state);
+        }
+
+        function startGameLoop(state) {
+            if (state.dropInterval) clearInterval(state.dropInterval);
+            if (state.aiInterval) clearInterval(state.aiInterval);
+            if (state.isAI) {
+                state.aiInterval = setInterval(() => aiTick(state), aiTickSpeed(state.level));
+            } else {
+                state.dropInterval = setInterval(() => gameLoop(state), state.gameLoopSpeed / state.level);
+            }
+        }
+
+        function aiTickSpeed(level) {
+            return Math.round(400 - (level - 1) * 38);
+        }
+
+        // ---------- ピース生成 ----------
+        function createNewPiece(state) {
+            const rand = getGlobalPieceIndex(state.pieceIndexPointer);
+            state.pieceIndexPointer++;
+            const shape = SHAPES[rand];
+            return {
+                shape: shape,
+                colorIndex: rand,
+                x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2),
+                y: 0
+            };
+        }
+
+        function spawnNewPiece(state) {
+            state.currentPiece = state.nextPiece;
+            state.nextPiece = createNewPiece(state);
+            state.hasHeldThisTurn = false;
+            state.isLockDelaying = false;
+            state.aiPlan = null;
+            if (!isValidMove(state.board, state.currentPiece.x, state.currentPiece.y, state.currentPiece.shape)) {
+                gameOver(state);
+            }
+            drawNextPiece(state);
+        }
+
+        // ---------- 描画 ----------
+        function drawBlock(ctx, x, y, colorIndex, blockSize) {
+            ctx.fillStyle = COLORS[colorIndex];
+            ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
+            ctx.strokeStyle = 'rgba(50, 50, 50, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x * blockSize, y * blockSize, blockSize, blockSize);
+        }
+
+        function drawBoard(state) {
+            state.ctx.fillStyle = '#eee';
+            state.ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    if (state.board[y][x] > 0) {
+                        drawBlock(state.ctx, x, y, state.board[y][x], BLOCK_SIZE);
+                    }
+                }
+            }
+        }
+
+        function drawCurrentPiece(state) {
+            if (state.isGameOver || !state.currentPiece) return;
+            const { x, y, shape, colorIndex } = state.currentPiece;
+            shape.forEach((row, rowY) => {
+                row.forEach((value, colX) => {
+                    if (value > 0) {
+                        drawBlock(state.ctx, x + colX, y + rowY, colorIndex, BLOCK_SIZE);
+                    }
+                });
+            });
+        }
+
+        function drawGhostPiece(state) {
+            if (state.isGameOver || state.isPaused || !state.currentPiece) return;
+            let ghostY = state.currentPiece.y;
+            while (isValidMove(state.board, state.currentPiece.x, ghostY + 1, state.currentPiece.shape)) {
+                ghostY++;
+            }
+            const { x, shape } = state.currentPiece;
+            state.ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+            shape.forEach((row, rowY) => {
+                row.forEach((value, colX) => {
+                    if (value > 0) {
+                        const drawX = (x + colX) * BLOCK_SIZE;
+                        const drawY = (ghostY + rowY) * BLOCK_SIZE;
+                        state.ctx.fillRect(drawX, drawY, BLOCK_SIZE, BLOCK_SIZE);
+                    }
+                });
+            });
+        }
+
+        function drawSidePanelPiece(pCtx, piece) {
+            pCtx.clearRect(0, 0, pCtx.canvas.width, pCtx.canvas.height);
+            pCtx.fillStyle = '#f9f9f9';
+            pCtx.fillRect(0, 0, pCtx.canvas.width, pCtx.canvas.height);
+            if (piece === null) return;
+            const { shape, colorIndex } = piece;
+            const xOffset = Math.floor((pCtx.canvas.width / NEXT_BLOCK_SIZE - shape[0].length) / 2);
+            const yOffset = Math.floor((pCtx.canvas.height / NEXT_BLOCK_SIZE - shape.length) / 2);
+            shape.forEach((row, rowY) => {
+                row.forEach((value, colX) => {
+                    if (value > 0) {
+                        drawBlock(pCtx, xOffset + colX, yOffset + rowY, colorIndex, NEXT_BLOCK_SIZE);
+                    }
+                });
+            });
+        }
+
+        function drawNextPiece(state) { drawSidePanelPiece(state.nextCtx, state.nextPiece); }
+        function drawHoldPiece(state) { drawSidePanelPiece(state.holdCtx, state.holdPiece); }
+
+        function draw(state) {
+            if (state.isGameOver || state.isPaused) return;
+            drawBoard(state);
+            drawGhostPiece(state);
+            drawCurrentPiece(state);
+        }
+
+        // ---------- 判定 ----------
+        function isValidMove(board, xPos, yPos, shape) {
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x] > 0) {
+                        const newX = xPos + x;
+                        const newY = yPos + y;
+                        if (newX < 0 || newX >= COLS || newY >= ROWS) return false;
+                        if (newY >= 0 && board[newY][newX] > 0) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function movePiece(state, dx, dy) {
+            if (state.isGameOver || state.isPaused) return false;
+            const newX = state.currentPiece.x + dx;
+            const newY = state.currentPiece.y + dy;
+            if (isValidMove(state.board, newX, newY, state.currentPiece.shape)) {
+                state.currentPiece.x = newX;
+                state.currentPiece.y = newY;
+                if (dx !== 0 && state.isLockDelaying) {
+                    state.isLockDelaying = false;
+                }
+                draw(state);
+                return true;
+            }
+            return false;
+        }
+
+        function getRotatedShape(shape, isClockwise) {
+            const N = shape.length;
+            const M = shape[0].length;
+            const newShape = Array.from({ length: M }, () => Array(N).fill(0));
+            for (let y = 0; y < N; y++) {
+                for (let x = 0; x < M; x++) {
+                    if (isClockwise) {
+                        newShape[x][N - 1 - y] = shape[y][x];
+                    } else {
+                        newShape[M - 1 - x][y] = shape[y][x];
+                    }
+                }
+            }
+            return newShape;
+        }
+
+        function rotatePiece(state, isClockwise = true) {
+            if (state.isGameOver || state.isPaused) return;
+            const newShape = getRotatedShape(state.currentPiece.shape, isClockwise);
+            const kicks = [
+                {x: 0, y: 0},   {x: -1, y: 0},  {x: 1, y: 0},
+                {x: 0, y: -1},  {x: -2, y: 0},  {x: 2, y: 0},
+                {x: -1, y: -1}, {x: 1, y: -1}
+            ];
+            for (let k of kicks) {
+                const newX = state.currentPiece.x + k.x;
+                const newY = state.currentPiece.y + k.y;
+                if (isValidMove(state.board, newX, newY, newShape)) {
+                    state.currentPiece.shape = newShape;
+                    state.currentPiece.x = newX;
+                    state.currentPiece.y = newY;
+                    if (state.isLockDelaying) state.isLockDelaying = false;
+                    draw(state);
+                    return;
+                }
+            }
+        }
+
+        function pieceLanded(state) {
+            state.currentPiece.shape.forEach((row, rowY) => {
+                row.forEach((value, colX) => {
+                    if (value > 0) {
+                        const boardX = state.currentPiece.x + colX;
+                        const boardY = state.currentPiece.y + rowY;
+                        if (boardY >= 0) state.board[boardY][boardX] = state.currentPiece.colorIndex;
+                    }
+                });
+            });
+            clearLines(state);
+            spawnNewPiece(state);
+            draw(state);
+        }
+
+        // ---------- お邪魔ブロック ----------
+        function addGarbage(state, count) {
+            if (!count || count <= 0 || state.isGameOver) return;
+            let overflow = false;
+            for (let i = 0; i < count; i++) {
+                if (state.board[0].some(cell => cell > 0)) overflow = true;
+                state.board.shift();
+                const holeCol = Math.floor(Math.random() * COLS);
+                const row = Array(COLS).fill(GARBAGE_COLOR_INDEX);
+                row[holeCol] = 0;
+                state.board.push(row);
+            }
+            if (state.currentPiece) {
+                state.currentPiece.y -= count;
+            }
+            if (overflow || (state.currentPiece && !isValidMove(state.board, state.currentPiece.x, state.currentPiece.y, state.currentPiece.shape))) {
+                gameOver(state);
+                return;
+            }
+            draw(state);
+        }
+
+        function clearLines(state) {
+            let linesCleared = 0;
+            for (let y = ROWS - 1; y >= 0; y--) {
+                if (state.board[y].every(cell => cell > 0)) {
+                    linesCleared++;
+                    state.board.splice(y, 1);
+                    state.board.unshift(Array(COLS).fill(0));
+                    y++;
+                }
+            }
+            if (linesCleared > 0) {
+                state.score += [0, 100, 300, 500, 800][linesCleared] * state.level;
+                state.lines += linesCleared;
+                if (!state.isAI) {
+                    const newLevel = Math.floor(state.lines / 10) + 1;
+                    if (newLevel > state.level) {
+                        state.level = newLevel;
+                        startGameLoop(state);
+                    }
+                }
+                state.scoreEl.textContent = state.score;
+                state.levelEl.textContent = state.level;
+                state.linesEl.textContent = state.lines;
+
+                if (activeMode === 'bot' && state.opponent && !state.opponent.isGameOver) {
+                    const garbageLines = GARBAGE_TABLE[linesCleared] || 0;
+                    if (garbageLines > 0) addGarbage(state.opponent, garbageLines);
+                } else if (activeMode === 'multi' && state === playerState) {
+                    const garbageLines = GARBAGE_TABLE[linesCleared] || 0;
+                    if (garbageLines > 0) MP.sendGarbage(garbageLines);
+                }
+            }
+            if (activeMode === 'multi' && state === playerState) {
+                MP.sendState();
+            }
+        }
+
+        function gameLoop(state) {
+            if (state.isGameOver || state.isPaused) return;
+            if (movePiece(state, 0, 1)) {
+                state.isLockDelaying = false;
+            } else {
+                if (state.isLockDelaying) {
+                    pieceLanded(state);
+                } else {
+                    state.isLockDelaying = true;
+                }
+            }
+        }
+
+        // ---------- BOT AI ----------
+        function isValidMoveGeneric(board, xPos, yPos, shape) {
+            return isValidMove(board, xPos, yPos, shape);
+        }
+
+        function cloneBoardAndPlace(board, x, y, shape, colorIndex) {
+            const sim = board.map(row => row.slice());
+            shape.forEach((row, rowY) => {
+                row.forEach((value, colX) => {
+                    if (value > 0) {
+                        const bx = x + colX;
+                        const by = y + rowY;
+                        if (by >= 0 && by < ROWS && bx >= 0 && bx < COLS) sim[by][bx] = colorIndex;
+                    }
+                });
+            });
+            return sim;
+        }
+
+        function evaluateBoard(simBoard) {
+            const heights = [];
+            for (let c = 0; c < COLS; c++) {
+                let h = 0;
+                for (let r = 0; r < ROWS; r++) {
+                    if (simBoard[r][c] > 0) { h = ROWS - r; break; }
+                }
+                heights.push(h);
+            }
+            const aggHeight = heights.reduce((a, b) => a + b, 0);
+            let holes = 0;
+            for (let c = 0; c < COLS; c++) {
+                let blockFound = false;
+                for (let r = 0; r < ROWS; r++) {
+                    if (simBoard[r][c] > 0) blockFound = true;
+                    else if (blockFound) holes++;
+                }
+            }
+            let bumpiness = 0;
+            for (let c = 0; c < COLS - 1; c++) bumpiness += Math.abs(heights[c] - heights[c + 1]);
+            let linesCleared = 0;
+            for (let r = 0; r < ROWS; r++) {
+                if (simBoard[r].every(v => v > 0)) linesCleared++;
+            }
+            return -0.51 * aggHeight + 0.76 * linesCleared - 0.36 * holes - 0.18 * bumpiness;
+        }
+
+        function rotationCountForShape(pieceIndex) {
+            if (pieceIndex === 3) return 1; // O
+            if (pieceIndex === 2 || pieceIndex === 6 || pieceIndex === 7) return 2; // I, S, Z
+            return 4; // T, L, J
+        }
+
+        // ある特定のミノ単体の、ベストな配置点とスコアを返す関数
+        function getBestMoveForPiece(board, pieceIndex) {
+            const shapeOriginal = SHAPES[pieceIndex];
+            const rotations = rotationCountForShape(pieceIndex);
+            let bestScore = -Infinity;
+            let bestMove = null;
+
+            let shape = shapeOriginal;
+            for (let r = 0; r < rotations; r++) {
+                for (let x = -3; x <= COLS + 3; x++) {
+                    let y = 0;
+                    if (!isValidMoveGeneric(board, x, y, shape)) continue;
+                    while (isValidMoveGeneric(board, x, y + 1, shape)) y++;
+                    const sim = cloneBoardAndPlace(board, x, y, shape, pieceIndex);
+                    const sc = evaluateBoard(sim);
+                    if (sc > bestScore) {
+                        bestScore = sc;
+                        bestMove = { shape: shape, x, y, score: sc };
+                    }
+                }
+                shape = getRotatedShape(shape, true);
+            }
+            return bestMove;
+        }
+
+        // ★ ホールドの評価も含めて意思決定を行うよう変更
+        function aiDecideMove(state) {
+            if (state.hasHeldThisTurn) {
+                // すでにそのターンでホールド済みの場合は現在のミノで決定
+                return getBestMoveForPiece(state.board, state.currentPiece.colorIndex);
+            }
+
+            // 1. 今のミノをそのまま使った場合のベスト
+            const currentBest = getBestMoveForPiece(state.board, state.currentPiece.colorIndex);
+
+            // 2. ホールドした場合に対象となるミノ
+            // まだホールドが空ならネクストのミノ、すでにあればホールド内のミノ
+            const targetHoldIndex = (state.holdPiece === null) ? state.nextPiece.colorIndex : state.holdPiece.colorIndex;
+            const holdBest = getBestMoveForPiece(state.board, targetHoldIndex);
+
+            // どちらも置けない場合はゲームオーバー候補
+            if (!currentBest && !holdBest) return null;
+            if (!currentBest) return { ...holdBest, action: 'hold' };
+            if (!holdBest) return { ...currentBest, action: 'current' };
+
+            // スコアを比較（ホールドした方が評価が高ければホールドを実行フラグを付与）
+            if (holdBest.score > currentBest.score) {
+                return { ...holdBest, action: 'hold' };
+            } else {
+                return { ...currentBest, action: 'current' };
+            }
+        }
+
+        function aiTick(state) {
+            if (state.isGameOver || state.isPaused || !state.currentPiece) return;
+            if (!state.aiPlan) {
+                const plan = aiDecideMove(state);
+                if (!plan) {
+                    gameOver(state);
+                    return;
+                }
+
+                // ★ ホールドアクションが選ばれた場合、ホールド関数を呼んで仕切り直し
+                if (plan.action === 'hold') {
+                    holdFunction(state);
+                    return; 
+                }
+
+                state.aiPlan = plan;
+                state.currentPiece.shape = state.aiPlan.shape;
+                if (!isValidMove(state.board, state.currentPiece.x, state.currentPiece.y, state.currentPiece.shape)) {
+                    state.currentPiece.x = Math.max(0, Math.min(COLS - state.currentPiece.shape[0].length, state.currentPiece.x));
+                }
+                draw(state);
+                return;
+            }
+            if (state.currentPiece.x < state.aiPlan.x) {
+                if (!movePiece(state, 1, 0)) {
+                    while (movePiece(state, 0, 1)) {}
+                    pieceLanded(state);
+                    state.aiPlan = null;
+                }
+            } else if (state.currentPiece.x > state.aiPlan.x) {
+                if (!movePiece(state, -1, 0)) {
+                    while (movePiece(state, 0, 1)) {}
+                    pieceLanded(state);
+                    state.aiPlan = null;
+                }
+            } else {
+                while (movePiece(state, 0, 1)) {}
+                pieceLanded(state);
+                state.aiPlan = null;
+            }
+        }
+
+        // ---------- ゲーム終了 ----------
+        function drawOverlay(state, text, color) {
+            state.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            state.ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+            state.ctx.fillStyle = color || 'white';
+            state.ctx.font = '24px "Silkscreen"';
+            state.ctx.textAlign = 'center';
+            state.ctx.fillText(text, state.canvas.width / 2, state.canvas.height / 2);
+        }
+
+        function stopState(state) {
+            if (state.dropInterval) clearInterval(state.dropInterval);
+            if (state.aiInterval) clearInterval(state.aiInterval);
+        }
+
+        function gameOver(state) {
+            if (state.isGameOver) return;
+            state.isGameOver = true;
+            stopState(state);
+            const opp = state.opponent;
+            if (activeMode === 'bot' && opp && !opp.isGameOver) {
+                opp.isGameOver = true;
+                stopState(opp);
+                drawOverlay(state, 'LOSE', '#ff6b6b');
+                drawOverlay(opp, 'WIN', '#5cd65c');
+            } else if (activeMode === 'multi' && state === playerState) {
+                drawOverlay(state, 'LOSE', '#ff6b6b');
+                MP.notifyGameOver();
+                MP.endMatch();
+                connBadge.classList.add('hidden');
+                if (!opp.isGameOver) {
+                    opp.isGameOver = true;
+                    drawOverlay(opp, 'WIN', '#5cd65c');
+                }
+            } else {
+                drawOverlay(state, 'GAME OVER');
+            }
+            startButton.disabled = false;
+            startButton.textContent = "RESTART";
+            levelSelect.disabled = false;
+            modeSolo.disabled = false;
+            modeBot.disabled = false;
+            modeMulti.disabled = false;
+        }
+
+        function togglePause() {
+            if (playerState.isGameOver) return;
+            if (activeMode === 'multi') return; // オンライン対戦中はポーズ不可
+            const states = activeMode === 'bot' ? [playerState, aiState] : [playerState];
+            const pausing = !playerState.isPaused;
+            states.forEach(state => {
+                state.isPaused = pausing;
+                if (pausing) {
+                    stopState(state);
+                    drawOverlay(state, 'PAUSED');
+                } else {
+                    startGameLoop(state);
+                    draw(state);
+                }
+            });
+            startButton.textContent = pausing ? "RESUME" : "START";
+        }
+
+        // ---------- ホールド ----------
+        function holdFunction(state) {
+            if (state.isGameOver || state.isPaused || state.hasHeldThisTurn) return;
+            state.hasHeldThisTurn = true;
+            state.isLockDelaying = false;
+            if (state.holdPiece === null) {
+                state.holdPiece = state.currentPiece;
+                spawnNewPiece(state);
+            } else {
+                [state.currentPiece, state.holdPiece] = [state.holdPiece, state.currentPiece];
+                state.currentPiece.x = Math.floor(COLS / 2) - Math.floor(state.currentPiece.shape[0].length / 2);
+                state.currentPiece.y = 0;
+                if (!isValidMove(state.board, state.currentPiece.x, state.currentPiece.y, state.currentPiece.shape)) gameOver(state);
+            }
+            drawHoldPiece(state);
+            draw(state);
+        }
+
+        // ---------- 開始・入力 ----------
+        function startMatch() {
+            activeMode = currentMode();
+            applyModeVisibility();
+            modeSolo.disabled = true;
+            modeBot.disabled = true;
+            modeMulti.disabled = true;
+
+            // マッチ毎にグローバルバッグをクリアして新規作成
+            globalPieceBag = [];
+            fillGlobalPieceBag();
+
+            init(playerState, 1);
+            if (activeMode === 'bot') {
+                const level = parseInt(levelSelect.value, 10);
+                botLabel.textContent = 'BOT (LV.' + level + ')';
+                init(aiState, level);
+                levelSelect.disabled = true;
+            } else {
+                aiState.isGameOver = true;
+                stopState(aiState);
+            }
+            startButton.textContent = "START";
+        }
+
+        // 相手の盤面を表示するだけの初期化（自動落下・AIループは回さない）
+        function initDisplayOnly(state) {
+            stopState(state);
+            state.board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+            state.score = 0;
+            state.level = 1;
+            state.lines = 0;
+            state.scoreEl.textContent = 0;
+            state.levelEl.textContent = 1;
+            state.linesEl.textContent = 0;
+            state.holdPiece = null;
+            state.currentPiece = null;
+            state.nextPiece = null;
+            drawHoldPiece(state);
+            drawNextPiece(state);
+            state.isGameOver = false;
+            state.isPaused = false;
+            drawBoard(state);
+        }
+
+        // オンライン対戦開始（マッチング成立後にMPモジュールから呼ばれる）
+        function startOnlineMatch(seed, opponentName) {
+            activeMode = 'multi';
+            applyModeVisibility();
+            modeSolo.disabled = true;
+            modeBot.disabled = true;
+            modeMulti.disabled = true;
+
+            setPieceSeed(seed);
+            globalPieceBag = [];
+            fillGlobalPieceBag();
+
+            botLabel.textContent = opponentName;
+            init(playerState, 1);
+            initDisplayOnly(aiState);
+            setPieceSeed(null); // 以後のローカル処理は通常乱数に戻す
+            startButton.textContent = "START";
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (playerState.isGameOver) {
+                    if (currentMode() === 'multi') MP.openFlow();
+                    else startMatch();
+                }
+                else if (playerState.isPaused) togglePause();
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'p' || e.key === 'P') { togglePause(); return; }
+            if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            if (playerState.isGameOver || playerState.isPaused) return;
+
+            switch (e.key) {
+                case 'ArrowLeft': movePiece(playerState, -1, 0); break;
+                case 'ArrowRight': movePiece(playerState, 1, 0); break;
+                case 'ArrowDown':
+                    if (!movePiece(playerState, 0, 1)) {
+                        if (playerState.isLockDelaying) pieceLanded(playerState);
+                        else playerState.isLockDelaying = true;
+                    }
+                    break;
+                case 'ArrowUp':
+                    if (e.shiftKey) rotatePiece(playerState, false);
+                    else rotatePiece(playerState, true);
+                    break;
+                case 'x': case 'X': rotatePiece(playerState, true); break;
+                case 'z': case 'Z': rotatePiece(playerState, false); break;
+                case ' ':
+                    while (movePiece(playerState, 0, 1)) {}
+                    pieceLanded(playerState);
+                    break;
+                case 'c': case 'C': holdFunction(playerState); break;
+            }
+        });
+
+        startButton.addEventListener('click', () => {
+            if (playerState.isGameOver) {
+                if (currentMode() === 'multi') MP.openFlow();
+                else startMatch();
+            }
+            else if (playerState.isPaused) togglePause();
+        });
+
+        // ---------- 自動ポーズ機能 ----------
+        window.addEventListener('blur', () => {
+            // すでにゲームオーバー、またはすでにポーズ中、またはまだゲームが始まっていない場合は何もしない
+            if (playerState.isGameOver || playerState.isPaused) return;
+            
+            // プレイ中の場合のみトグルポーズを呼び出して一時停止する
+            togglePause();
+        });
+
+        // =====================================================================
+        // ---------- マルチプレイモジュール (MP) ----------
+        // 実際にオンライン対戦を動かすには、Cloudflare Workers + Durable Objects
+        // で作った中継サーバーが別途必要です。デプロイ後、下記の WS_SERVER_URL を
+        // 自分のワーカーの URL (wss://～) に書き換えてください。
+        // サーバー側のサンプルコードは multiplayer-worker.js を参照してください。
+        // =====================================================================
+        const MP = (() => {
+            const WS_SERVER_URL = 'wss://rec877.com/leakggmpapi/ws';
+
+            const usernameOverlay = document.getElementById('usernameModalOverlay');
+            const usernameInput = document.getElementById('usernameInput');
+            const usernameError = document.getElementById('usernameError');
+            const usernameSaveBtn = document.getElementById('usernameSaveBtn');
+            const usernameCancelLink = document.getElementById('usernameCancelLink');
+
+            const multiOverlay = document.getElementById('multiModalOverlay');
+            const steps = {
+                choice: document.getElementById('stepChoice'),
+                codeMenu: document.getElementById('stepCodeMenu'),
+                joinInput: document.getElementById('stepJoinInput'),
+                hostWait: document.getElementById('stepHostWait'),
+                matchmaking: document.getElementById('stepMatchmaking'),
+                connError: document.getElementById('stepConnError')
+            };
+
+            const btnGoRandomMatch = document.getElementById('btnGoRandomMatch');
+            const btnGoCodeMenu = document.getElementById('btnGoCodeMenu');
+            const choiceCancelLink = document.getElementById('choiceCancelLink');
+
+            const btnCreateRoom = document.getElementById('btnCreateRoom');
+            const btnJoinRoom = document.getElementById('btnJoinRoom');
+            const codeMenuBackLink = document.getElementById('codeMenuBackLink');
+
+            const joinCodeInput = document.getElementById('joinCodeInput');
+            const joinCodeError = document.getElementById('joinCodeError');
+            const btnSubmitJoinCode = document.getElementById('btnSubmitJoinCode');
+            const joinInputBackLink = document.getElementById('joinInputBackLink');
+
+            const hostRoomCode = document.getElementById('hostRoomCode');
+            const hostWaitStatus = document.getElementById('hostWaitStatus');
+            const btnCancelHostWait = document.getElementById('btnCancelHostWait');
+
+            const matchmakingStatus = document.getElementById('matchmakingStatus');
+            const btnCancelMatchmaking = document.getElementById('btnCancelMatchmaking');
+
+            const connErrorMessage = document.getElementById('connErrorMessage');
+            const btnConnErrorBack = document.getElementById('btnConnErrorBack');
+
+            let ws = null;
+            let pendingAfterUsername = null; // ユーザー名設定後に実行するコールバック
+            let matched = false;
+
+            function getUsername() {
+                return localStorage.getItem('tetris_username') || '';
+            }
+            function setUsername(name) {
+                localStorage.setItem('tetris_username', name);
+            }
+
+            function setConnBadge(state) {
+                // state: 'connecting' | 'connected' | 'disconnected'
+                connBadge.classList.remove('connecting', 'connected', 'disconnected', 'hidden');
+                connBadge.textContent = state === 'connecting' ? '接続中' : state === 'connected' ? '接続済み' : '切断';
+                connBadge.classList.add(state);
+            }
+
+            function showStep(name) {
+                Object.values(steps).forEach(el => el.classList.add('hidden'));
+                steps[name].classList.remove('hidden');
+            }
+
+            function openMultiOverlay(stepName) {
+                multiOverlay.classList.remove('hidden');
+                showStep(stepName);
+            }
+            function closeMultiOverlay() {
+                multiOverlay.classList.add('hidden');
+            }
+
+            // ---------- ユーザー名モーダル ----------
+            function requireUsername(onDone) {
+                if (getUsername()) { onDone(); return; }
+                pendingAfterUsername = onDone;
+                usernameInput.value = '';
+                usernameError.textContent = '';
+                usernameOverlay.classList.remove('hidden');
+                usernameInput.focus();
+            }
+
+            usernameSaveBtn.addEventListener('click', () => {
+                const name = usernameInput.value.trim();
+                if (name.length < 1 || name.length > 12) {
+                    usernameError.textContent = '1〜12文字で入力してください';
+                    return;
+                }
+                setUsername(name);
+                usernameOverlay.classList.add('hidden');
+                if (pendingAfterUsername) {
+                    const cb = pendingAfterUsername;
+                    pendingAfterUsername = null;
+                    cb();
+                }
+            });
+            usernameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); usernameSaveBtn.click(); }
+            });
+
+            // ---------- フロー開始 ----------
+            function openFlow() {
+                if (matched) { openMultiOverlay('choice'); return; }
+                requireUsername(() => {
+                    openMultiOverlay('choice');
+                });
+            }
+
+            function backToModeSolo() {
+                closeMultiOverlay();
+                if (!matched) {
+                    modeSolo.checked = true;
+                    applyModeVisibility();
+                }
+            }
+
+            choiceCancelLink.addEventListener('click', backToModeSolo);
+            codeMenuBackLink.addEventListener('click', () => showStep('choice'));
+            joinInputBackLink.addEventListener('click', () => showStep('codeMenu'));
+
+            btnGoCodeMenu.addEventListener('click', () => showStep('codeMenu'));
+
+            // ---------- WebSocket接続 ----------
+            function connect(onOpen) {
+                if (ws) { try { ws.onclose = null; ws.close(); } catch (e) {} ws = null; }
+                try {
+                    ws = new WebSocket(WS_SERVER_URL);
+                } catch (err) {
+                    showConnError('サーバーに接続できませんでした');
+                    return;
+                }
+                setConnBadge('connecting');
+                ws.addEventListener('open', () => { onOpen(); });
+                ws.addEventListener('message', (ev) => {
+                    let msg;
+                    try { msg = JSON.parse(ev.data); } catch { return; }
+                    handleServerMessage(msg);
+                });
+                ws.addEventListener('close', () => {
+                    if (matched && !playerState.isGameOver) {
+                        setConnBadge('disconnected');
+                        // 対戦相手切断相当の扱い（自分の接続が切れた場合も試合を止める）
+                        gameOver(playerState);
+                    }
+                });
+                ws.addEventListener('error', () => {
+                    showConnError('サーバーに接続できませんでした。時間をおいて再度お試しください。');
+                });
+            }
+
+            function showConnError(text) {
+                connErrorMessage.textContent = text;
+                openMultiOverlay('connError');
+            }
+            btnConnErrorBack.addEventListener('click', () => showStep('choice'));
+
+            function send(obj) {
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+            }
+
+            // ---------- ランダムマッチ ----------
+            btnGoRandomMatch.addEventListener('click', () => {
+                matchmakingStatus.textContent = '検索中...';
+                openMultiOverlay('matchmaking');
+                connect(() => {
+                    send({ type: 'find_match', name: getUsername() });
+                });
+            });
+            btnCancelMatchmaking.addEventListener('click', () => {
+                send({ type: 'cancel' });
+                if (ws) ws.close();
+                backToModeSolo();
+            });
+
+            // ---------- コードで作成 ----------
+            btnCreateRoom.addEventListener('click', () => {
+                hostRoomCode.textContent = '------';
+                hostWaitStatus.textContent = '接続中...';
+                openMultiOverlay('hostWait');
+                connect(() => {
+                    send({ type: 'create_room', name: getUsername() });
+                });
+            });
+            btnCancelHostWait.addEventListener('click', () => {
+                send({ type: 'cancel' });
+                if (ws) ws.close();
+                backToModeSolo();
+            });
+
+            // ---------- コードで参加 ----------
+            btnJoinRoom.addEventListener('click', () => {
+                joinCodeInput.value = '';
+                joinCodeError.textContent = '';
+                showStep('joinInput');
+                joinCodeInput.focus();
+            });
+            btnSubmitJoinCode.addEventListener('click', () => {
+                const code = joinCodeInput.value.trim().toUpperCase();
+                if (code.length !== 6) {
+                    joinCodeError.textContent = '6文字のコードを入力してください';
+                    return;
+                }
+                joinCodeError.textContent = '';
+                btnSubmitJoinCode.disabled = true;
+                connect(() => {
+                    send({ type: 'join_room', code, name: getUsername() });
+                });
+            });
+            joinCodeInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); btnSubmitJoinCode.click(); }
+            });
+            joinCodeInput.addEventListener('input', () => {
+                joinCodeInput.value = joinCodeInput.value.toUpperCase();
+            });
+
+            // ---------- サーバーからのメッセージ処理 ----------
+            function handleServerMessage(msg) {
+                switch (msg.type) {
+                    case 'room_created':
+                        hostRoomCode.textContent = msg.code;
+                        hostWaitStatus.textContent = '待機中...';
+                        break;
+                    case 'error':
+                        btnSubmitJoinCode.disabled = false;
+                        if (steps.joinInput.classList.contains('hidden')) {
+                            showConnError(msg.message || 'エラーが発生しました');
+                        } else {
+                            joinCodeError.textContent = msg.message || 'エラーが発生しました';
+                        }
+                        break;
+                    case 'matched':
+                        matched = true;
+                        setConnBadge('connected');
+                        closeMultiOverlay();
+                        startOnlineMatch(msg.seed, msg.opponentName || '対戦相手');
+                        break;
+                    case 'opponent_state':
+                        aiState.score = msg.score;
+                        aiState.level = msg.level;
+                        aiState.lines = msg.lines;
+                        aiState.scoreEl.textContent = msg.score;
+                        aiState.levelEl.textContent = msg.level;
+                        aiState.linesEl.textContent = msg.lines;
+                        if (msg.board) {
+                            aiState.board = msg.board;
+                            drawBoard(aiState);
+                        }
+                        break;
+                    case 'garbage':
+                        addGarbage(playerState, msg.count);
+                        break;
+                    case 'opponent_gameover':
+                        if (!aiState.isGameOver) {
+                            aiState.isGameOver = true;
+                            drawOverlay(aiState, 'LOSE', '#ff6b6b');
+                        }
+                        if (!playerState.isGameOver) {
+                            playerState.isGameOver = true;
+                            stopState(playerState);
+                            drawOverlay(playerState, 'WIN', '#5cd65c');
+                            startButton.disabled = false;
+                            startButton.textContent = 'RESTART';
+                            modeSolo.disabled = false;
+                            modeBot.disabled = false;
+                            modeMulti.disabled = false;
+                            endMatch();
+                            connBadge.classList.add('hidden');
+                        }
+                        break;
+                    case 'opponent_left':
+                        setConnBadge('disconnected');
+                        if (!playerState.isGameOver) {
+                            gameOver(playerState);
+                        }
+                        break;
+                }
+            }
+
+            // ---------- ゲーム側から呼ばれる送信関数 ----------
+            function sendState() {
+                send({
+                    type: 'state',
+                    board: playerState.board,
+                    score: playerState.score,
+                    level: playerState.level,
+                    lines: playerState.lines
+                });
+            }
+            function sendGarbage(count) {
+                send({ type: 'garbage', count });
+            }
+            function notifyGameOver() {
+                send({ type: 'gameover' });
+            }
+            function endMatch() {
+                matched = false;
+                if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+            }
+
+            return { openFlow, sendState, sendGarbage, notifyGameOver, endMatch };
+        })();
+
+        function showStartScreen() {
+            [playerState, aiState].forEach(state => {
+                drawBoard(state);
+                state.holdCtx.fillStyle = '#f9f9f9';
+                state.holdCtx.fillRect(0, 0, state.holdCanvas.width, state.holdCanvas.height);
+                state.nextCtx.fillStyle = '#f9f9f9';
+                state.nextCtx.fillRect(0, 0, state.nextCanvas.width, state.nextCanvas.height);
+                state.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                state.ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+                state.ctx.fillStyle = 'white';
+                state.ctx.font = '14px "Silkscreen"';
+                state.ctx.textAlign = 'center';
+                state.ctx.fillText('PRESS START', state.canvas.width / 2, state.canvas.height / 2);
+            });
+        }
+
+        showStartScreen();
+    </script>
+</body>
+</html>
