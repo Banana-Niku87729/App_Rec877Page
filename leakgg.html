@@ -656,6 +656,9 @@
             drawBoard(state);
             drawGhostPiece(state);
             drawCurrentPiece(state);
+            if (activeMode === 'multi' && state === playerState) {
+                MP.sendState();
+            }
         }
 
         // ---------- 判定 ----------
@@ -797,7 +800,7 @@
                 }
             }
             if (activeMode === 'multi' && state === playerState) {
-                MP.sendState();
+                MP.sendState(true);
             }
         }
 
@@ -1415,8 +1418,10 @@
                         aiState.linesEl.textContent = msg.lines;
                         if (msg.board) {
                             aiState.board = msg.board;
-                            drawBoard(aiState);
                         }
+                        aiState.currentPiece = msg.piece || null;
+                        drawBoard(aiState);
+                        drawCurrentPiece(aiState);
                         break;
                     case 'garbage':
                         addGarbage(playerState, msg.count);
@@ -1449,13 +1454,21 @@
             }
 
             // ---------- ゲーム側から呼ばれる送信関数 ----------
-            function sendState() {
+            let lastStateSentAt = 0;
+            const STATE_SEND_INTERVAL = 50; // ms（連続送信の負荷を抑えるスロットル）
+
+            function sendState(force = false) {
+                const now = performance.now();
+                if (!force && now - lastStateSentAt < STATE_SEND_INTERVAL) return;
+                lastStateSentAt = now;
+                const p = playerState.currentPiece;
                 send({
                     type: 'state',
                     board: playerState.board,
                     score: playerState.score,
                     level: playerState.level,
-                    lines: playerState.lines
+                    lines: playerState.lines,
+                    piece: p ? { x: p.x, y: p.y, shape: p.shape, colorIndex: p.colorIndex } : null
                 });
             }
             function sendGarbage(count) {
