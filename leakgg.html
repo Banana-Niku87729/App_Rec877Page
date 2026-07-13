@@ -1009,7 +1009,23 @@
             modeMulti.disabled = false;
         }
 
-        function togglePause() {
+        function handleOpponentDisconnect() {
+            if (playerState.isGameOver) return; // 既に決着済みなら何もしない
+            playerState.isGameOver = true;
+            aiState.isGameOver = true;
+            stopState(playerState);
+            stopState(aiState);
+            drawOverlay(playerState, 'WIN', '#5cd65c');
+            drawOverlay(aiState, '切断');
+            MP.endMatch();
+            connBadge.classList.add('hidden');
+            startButton.disabled = false;
+            startButton.textContent = "RESTART";
+            levelSelect.disabled = false;
+            modeSolo.disabled = false;
+            modeBot.disabled = false;
+            modeMulti.disabled = false;
+        }
             if (playerState.isGameOver) return;
             if (activeMode === 'multi') return; // オンライン対戦中はポーズ不可
             const states = activeMode === 'bot' ? [playerState, aiState] : [playerState];
@@ -1446,9 +1462,7 @@
                         break;
                     case 'opponent_left':
                         setConnBadge('disconnected');
-                        if (!playerState.isGameOver) {
-                            gameOver(playerState);
-                        }
+                        handleOpponentDisconnect();
                         break;
                 }
             }
